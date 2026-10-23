@@ -1,6 +1,6 @@
-import React from 'react';
-import MyGlobe from './MyGlobe';
-import './App.css'; // Optional: keep this if you want to add global styles later
+import React from "react";
+import MyGlobe from "./MyGlobe";
+import "./App.css";
 
 function App() {
   return (
