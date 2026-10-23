@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import Globe from "react-globe.gl";
+import { calculateDistance, getCentroid } from "./utils";
+import { initialPlaces } from "./data";
+import "./MyGlobe.css"; // Import styles
 
 const MyGlobe = () => {
   const globeEl = useRef();
@@ -13,19 +16,14 @@ const MyGlobe = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [sunlight, setSunlight] = useState(false);
 
-  // Distance Measure Tool ---
+  // States for Distance Measure Tool
   const [measureMode, setMeasureMode] = useState(false);
   const [measurePoints, setMeasurePoints] = useState([]);
   const [measureDistance, setMeasureDistance] = useState(null);
 
-  const [places, setPlaces] = useState([
-    { name: "New York", lat: 40.7128, lng: -74.006 },
-    { name: "London", lat: 51.5074, lng: -0.1278 },
-    { name: "Tokyo", lat: 35.6762, lng: 139.6503 },
-    { name: "Sydney", lat: -33.8688, lng: 151.2093 },
-  ]);
+  const [places] = useState(initialPlaces);
 
-  // Fetch data on mount
+  // Fetch geoJSON data
   useEffect(() => {
     fetch(
       "https://raw.githubusercontent.com/vasturiano/react-globe.gl/master/example/datasets/ne_110m_admin_0_countries.geojson",
@@ -34,7 +32,7 @@ const MyGlobe = () => {
       .then((data) => setCountries(data.features));
   }, []);
 
-  // Effect to handle auto-rotation toggle
+  // Auto-rotation toggle
   useEffect(() => {
     if (globeEl.current && globeEl.current.controls()) {
       const controls = globeEl.current.controls();
@@ -44,7 +42,7 @@ const MyGlobe = () => {
     }
   }, [autoRotate]);
 
-  // --- Solar Illumination (Stub from previous step) ---
+  // Solar Illumination
   useEffect(() => {
     const timeout = setTimeout(() => {
       if (globeEl.current) {
@@ -84,55 +82,20 @@ const MyGlobe = () => {
     return () => clearTimeout(timeout);
   }, [sunlight]);
 
-  // Calculate distance (Haversine formula) ---
-  const calculateDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 6371; // Earth's radius in kilometers
-    const dLat = ((lat2 - lat1) * Math.PI) / 180;
-    const dLon = ((lon2 - lon1) * Math.PI) / 180;
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return Math.round(R * c); // Distance in km
-  };
-
-  // Handle Map Clicks for measuring ---
+  // Handle Map Clicks for measuring
   const handleMapClick = (lat, lng) => {
     if (!measureMode) return;
 
     if (measurePoints.length === 0 || measurePoints.length === 2) {
-      // Start a new measurement
       setMeasurePoints([{ lat, lng }]);
       setMeasureDistance(null);
     } else if (measurePoints.length === 1) {
-      // Complete the measurement
       const p1 = measurePoints[0];
       const p2 = { lat, lng };
       setMeasurePoints([p1, p2]);
       const dist = calculateDistance(p1.lat, p1.lng, p2.lat, p2.lng);
       setMeasureDistance(dist);
     }
-  };
-
-  // Helper to find the center of a country to zoom to
-  const getCentroid = (geometry) => {
-    let flatCoords = [];
-    const flatten = (arr) => {
-      if (typeof arr[0] === "number") {
-        flatCoords.push(arr);
-        return;
-      }
-      arr.forEach(flatten);
-    };
-    flatten(geometry.coordinates);
-    let minLng = Math.min(...flatCoords.map((c) => c[0]));
-    let maxLng = Math.max(...flatCoords.map((c) => c[0]));
-    let minLat = Math.min(...flatCoords.map((c) => c[1]));
-    let maxLat = Math.max(...flatCoords.map((c) => c[1]));
-    return { lat: (minLat + maxLat) / 2, lng: (minLng + maxLng) / 2 };
   };
 
   const handleSearch = (e) => {
@@ -147,7 +110,6 @@ const MyGlobe = () => {
     }
   };
 
-  // Updated to support Measure Mode
   const handlePolygonClick = (polygon, event, { lat, lng }) => {
     if (measureMode) {
       handleMapClick(lat, lng);
@@ -158,7 +120,7 @@ const MyGlobe = () => {
 
   const handleReset = () => {
     setSearchQuery("");
-    setMeasurePoints([]); // Reset distance points
+    setMeasurePoints([]);
     setMeasureDistance(null);
     globeEl.current.pointOfView({ altitude: 2.5 }, 1000);
   };
@@ -167,58 +129,15 @@ const MyGlobe = () => {
     setMeasureMode(!measureMode);
     setMeasurePoints([]);
     setMeasureDistance(null);
-    if (!measureMode) {
-      setAutoRotate(false); // Auto-pause rotation when trying to measure
-    }
-  };
-
-  const panelElementStyle = {
-    padding: "10px 15px",
-    backgroundColor: "rgba(255, 255, 255, 0.8)",
-    color: "#333",
-    border: "1px solid #ccc",
-    borderRadius: "6px",
-    cursor: "pointer",
-    fontWeight: "bold",
-    fontFamily: "sans-serif",
-    backdropFilter: "blur(4px)",
-    boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
-    outline: "none",
+    if (!measureMode) setAutoRotate(false);
   };
 
   return (
-    <div
-      style={{
-        width: "100vw",
-        height: "100vh",
-        margin: 0,
-        overflow: "hidden",
-        position: "relative",
-        background: "black",
-      }}
-    >
-      {/* --- UI Bottom Panel for Measure Tool --- */}
+    <div className="globe-container">
+      {/* Measure UI Panel */}
       {measureMode && (
-        <div
-          style={{
-            position: "absolute",
-            bottom: "30px",
-            left: "50%",
-            transform: "translateX(-50%)",
-            backgroundColor: "rgba(0,0,0,0.85)",
-            color: "white",
-            padding: "20px 30px",
-            borderRadius: "12px",
-            fontFamily: "sans-serif",
-            zIndex: 10,
-            textAlign: "center",
-            border: "1px solid #ffcc00",
-            boxShadow: "0 0 20px rgba(255, 204, 0, 0.3)",
-          }}
-        >
-          <h3 style={{ margin: "0 0 10px 0", color: "#ffcc00" }}>
-            Measure Distance
-          </h3>
+        <div className="measure-panel">
+          <h3 className="measure-title">Measure Distance</h3>
           {measurePoints.length === 0 && (
             <p style={{ margin: 0 }}>
               Click anywhere on the globe to set <b>Point A</b>.
@@ -231,26 +150,14 @@ const MyGlobe = () => {
           )}
           {measurePoints.length === 2 && (
             <>
-              <div
-                style={{
-                  fontSize: "32px",
-                  fontWeight: "bold",
-                  margin: "10px 0",
-                }}
-              >
+              <div className="measure-value">
                 {measureDistance.toLocaleString()} km
               </div>
               <button
+                className="panel-element btn-measure-reset"
                 onClick={() => {
                   setMeasurePoints([]);
                   setMeasureDistance(null);
-                }}
-                style={{
-                  ...panelElementStyle,
-                  backgroundColor: "#333",
-                  color: "white",
-                  border: "1px solid #666",
-                  padding: "5px 15px",
                 }}
               >
                 Reset Points
@@ -260,23 +167,12 @@ const MyGlobe = () => {
         </div>
       )}
 
-      {/* Top Right UI Control Panel */}
-      <div
-        style={{
-          position: "absolute",
-          top: "20px",
-          right: "20px",
-          zIndex: 10,
-          display: "flex",
-          flexDirection: "column",
-          gap: "10px",
-          width: "200px",
-        }}
-      >
+      {/* Control Panel */}
+      <div className="control-panel">
         <select
           value={searchQuery}
           onChange={handleSearch}
-          style={panelElementStyle}
+          className="panel-element"
         >
           <option value="">Search Country...</option>
           {[...countries]
@@ -292,54 +188,42 @@ const MyGlobe = () => {
 
         <button
           onClick={() => setAutoRotate(!autoRotate)}
-          style={panelElementStyle}
+          className="panel-element"
         >
           {autoRotate ? "Pause Rotation" : "Start Rotation"}
         </button>
 
         <button
           onClick={() => setShowCountries(!showCountries)}
-          style={panelElementStyle}
+          className="panel-element"
         >
           {showCountries ? "Hide Borders" : "Show Borders"}
         </button>
 
         <button
           onClick={() => setSunlight(!sunlight)}
-          style={panelElementStyle}
+          className="panel-element"
         >
           {sunlight ? "Disable Sunlight" : "Enable Sunlight"}
         </button>
 
-        {/* --- Measure Mode Toggle Button --- */}
         <button
           onClick={toggleMeasureMode}
-          style={{
-            ...panelElementStyle,
-            backgroundColor: measureMode ? "#ffcc00" : "rgba(255,255,255,0.8)",
-          }}
+          className={`panel-element ${measureMode ? "active-measure" : ""}`}
         >
           {measureMode ? "Stop Measuring" : "Measure Distance"}
         </button>
 
-        <button
-          onClick={handleReset}
-          style={{
-            ...panelElementStyle,
-            backgroundColor: "rgba(0, 150, 255, 0.8)",
-            color: "white",
-            border: "none",
-          }}
-        >
+        <button onClick={handleReset} className="panel-element btn-reset">
           Reset View
         </button>
       </div>
 
+      {/* 3D Globe */}
       <Globe
         ref={globeEl}
         globeImageUrl="//unpkg.com/three-globe/example/img/earth-blue-marble.jpg"
         backgroundImageUrl="//unpkg.com/three-globe/example/img/night-sky.png"
-        // --- Intercept direct globe clicks for measuring oceans ---
         onGlobeClick={({ lat, lng }) => {
           if (measureMode) handleMapClick(lat, lng);
         }}
@@ -365,8 +249,8 @@ const MyGlobe = () => {
         htmlElement={(d) => {
           const el = document.createElement("div");
           el.innerHTML = `
-            <div style="width: 14px; height: 14px; background-color: #ff3366; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px #ff3366;"></div>
-            <div style="color: white; font-weight: bold; font-family: sans-serif; font-size: 14px; margin-top: 4px; text-align: center; transform: translateX(-30%); text-shadow: 1px 1px 2px black;">${d.name}</div>
+            <div class="marker-dot"></div>
+            <div class="marker-label">${d.name}</div>
           `;
           el.style.pointerEvents = "auto";
           el.style.cursor = "pointer";
@@ -382,13 +266,11 @@ const MyGlobe = () => {
           };
           return el;
         }}
-        // --- Rings at the click points ---
         ringsData={measurePoints}
         ringColor={() => "#ffcc00"}
         ringMaxRadius={3}
         ringPropagationSpeed={2}
         ringRepeatPeriod={800}
-        // --- Glowing Arc between the two points ---
         arcsData={
           measurePoints.length === 2
             ? [
