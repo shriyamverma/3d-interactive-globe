@@ -7,4 +7,12 @@ export const initialPlaces = [
   { name: "Bangalore", lat: 12.9716, lng: 77.5946 },
   { name: "Bangkok", lat: 13.7563, lng: 100.5018 },
   { name: "Cairo", lat: 30.0444, lng: 31.2357 },
+  { name: "Buenos Aires", lat: -34.6037, lng: -58.3816 },
+  { name: "Dubai", lat: 25.2048, lng: 55.2708 },
+  { name: "Cape Town", lat: -33.9249, lng: 18.4241 },
+  { name: "Moscow", lat: 55.7558, lng: 37.6173 },
+  { name: "Hong Kong", lat: 22.3193, lng: 114.1694 },
+  { name: "Las Vegas", lat: 36.1699, lng: -115.1398 },
+  { name: "Vancouver", lat: 49.2827, lng: -123.1207 },
+  { name: "Singapore", lat: 1.3521, lng: 103.8198 },
 ];

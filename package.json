@@ -1,13 +1,16 @@
 {
-  "name": "3d-globe",
+  "name": "3d-interactive-globe",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.0.1",
+  "homepage": "https://shriyamverma.github.io/3d-interactive-globe/",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d dist"
   },
   "dependencies": {
     "react": "^19.3.1",
@@ -23,6 +26,7 @@
     "eslint": "^10.13.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.7",
+    "gh-pages": "^6.1.1",
     "globals": "^17.13.0",
     "vite": "^8.3.4"
   }
