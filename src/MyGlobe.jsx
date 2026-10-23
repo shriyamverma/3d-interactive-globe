@@ -113,8 +113,11 @@ const MyGlobe = () => {
     }
   }, [autoRotate, activeTour]);
 
+  // Solar Illumination
   useEffect(() => {
-    const timeout = setTimeout(() => {
+    let interval;
+
+    const updateSunPosition = () => {
       if (globeEl.current) {
         const scene = globeEl.current.scene();
         const ambientLight = scene.children.find(
@@ -132,13 +135,20 @@ const MyGlobe = () => {
             directionalLight.color.setHex(0xffffee);
 
             const now = new Date();
-            const utcHour = now.getUTCHours() + now.getUTCMinutes() / 60;
+            const utcHour =
+              now.getUTCHours() +
+              now.getUTCMinutes() / 60 +
+              now.getUTCSeconds() / 3600;
+
+            // Calculate where the sun is currently positioned over the Earth
             const sunLng = 180 - utcHour * 15;
             const month = now.getUTCMonth();
             const sunLat = -23.5 * Math.cos(((month + 0.5) * Math.PI) / 6);
 
+            // FIXED TRIGONOMETRY:
+            // (90 - sunLng) maps the coordinates properly to the 3D globe's axis
             const phi = (90 - sunLat) * (Math.PI / 180);
-            const theta = (sunLng + 90) * (Math.PI / 180);
+            const theta = (90 - sunLng) * (Math.PI / 180);
             const r = 200;
 
             directionalLight.position.set(
@@ -155,8 +165,18 @@ const MyGlobe = () => {
           }
         }
       }
-    }, 100);
-    return () => clearTimeout(timeout);
+    };
+
+    const timeout = setTimeout(updateSunPosition, 100);
+
+    if (sunlight) {
+      interval = setInterval(updateSunPosition, 60000);
+    }
+
+    return () => {
+      clearTimeout(timeout);
+      if (interval) clearInterval(interval);
+    };
   }, [sunlight]);
 
   // --- Tour Camera Logic ---
