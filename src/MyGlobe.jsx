@@ -25,26 +25,51 @@ const MyGlobe = () => {
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [countryInfo, setCountryInfo] = useState(null);
 
-  // --- NEW: Store the open-source encyclopedia data locally ---
+  // Store the open-source encyclopedia data locally
   const [countryEncyclopedia, setCountryEncyclopedia] = useState([]);
 
   const [places] = useState(initialPlaces);
 
+  // ISS Tracker State
+  const [issLocation, setIssLocation] = useState(null);
+
   // Fetch data on mount
   useEffect(() => {
-    // 1. Fetch Globe Borders
     fetch(
       "https://raw.githubusercontent.com/vasturiano/react-globe.gl/master/example/datasets/ne_110m_admin_0_countries.geojson",
     )
       .then((res) => res.json())
       .then((data) => setCountries(data.features));
 
-    // 2. Fetch Open-Source Country Encyclopedia (mledoze/countries)
     fetch(
       "https://raw.githubusercontent.com/mledoze/countries/master/countries.json",
     )
       .then((res) => res.json())
       .then((data) => setCountryEncyclopedia(data));
+  }, []);
+
+  // Live ISS Fetcher
+  useEffect(() => {
+    const fetchISS = async () => {
+      try {
+        const res = await fetch(
+          "https://api.wheretheiss.at/v1/satellites/25544",
+        );
+        const data = await res.json();
+        setIssLocation({
+          name: "International Space Station",
+          lat: data.latitude,
+          lng: data.longitude,
+          isISS: true,
+        });
+      } catch (error) {
+        console.warn("ISS Tracker temporarily unavailable.");
+      }
+    };
+
+    fetchISS();
+    const interval = setInterval(fetchISS, 4000);
+    return () => clearInterval(interval);
   }, []);
 
   // Auto-rotation toggle
@@ -71,11 +96,8 @@ const MyGlobe = () => {
 
         if (ambientLight && directionalLight) {
           if (sunlight) {
-            // 1. Drop the night side to near-pitch black (just a tiny hint of moonlight)
             ambientLight.intensity = 0.02;
             ambientLight.color.setHex(0x222233);
-
-            // 2. Crank up the Sun's brightness to create a sharp shadow line
             directionalLight.intensity = 4;
             directionalLight.color.setHex(0xffffee);
 
@@ -95,7 +117,6 @@ const MyGlobe = () => {
               r * Math.sin(phi) * Math.sin(theta),
             );
           } else {
-            // Flat daylight mode
             ambientLight.intensity = 0.8;
             ambientLight.color.setHex(0xffffff);
             directionalLight.intensity = 1;
@@ -124,7 +145,6 @@ const MyGlobe = () => {
     }
   };
 
-  // --- NEW: INSTANT LOCAL DATA FETCHER ---
   const showCountryInfo = (properties) => {
     const countryName = properties.ADMIN || properties.NAME || "Unknown";
     setIsPanelOpen(true);
@@ -132,7 +152,6 @@ const MyGlobe = () => {
     const a2 = properties.ISO_A2 || properties.iso_a2;
     const isoCode = a2 && a2 !== "-99" ? a2 : null;
 
-    // Instantly search our locally downloaded encyclopedia
     const info = countryEncyclopedia.find(
       (c) =>
         (isoCode && c.cca2 === isoCode) ||
@@ -140,7 +159,6 @@ const MyGlobe = () => {
         c.name.official === countryName,
     );
 
-    // Free open-source flag CDN
     const flagUrl = isoCode
       ? `https://flagcdn.com/${isoCode.toLowerCase()}.svg`
       : null;
@@ -165,7 +183,6 @@ const MyGlobe = () => {
           : "N/A",
       });
     } else {
-      // Fallback for tiny islands/territories missing from the encyclopedia
       setCountryInfo({
         name: countryName,
         flag: flagUrl,
@@ -365,6 +382,24 @@ const MyGlobe = () => {
         >
           {measureMode ? "Stop Measuring" : "Measure Distance"}
         </button>
+
+        {/* --- Find ISS Button --- */}
+        <button
+          onClick={() => {
+            if (issLocation) {
+              globeEl.current.pointOfView(
+                { lat: issLocation.lat, lng: issLocation.lng, altitude: 0.8 },
+                1000,
+              );
+            }
+          }}
+          className="panel-element"
+          disabled={!issLocation}
+          style={{ fontWeight: "bold" }}
+        >
+          🛰️ Live ISS satellite
+        </button>
+
         <button onClick={handleReset} className="panel-element btn-reset">
           Reset View
         </button>
@@ -374,7 +409,6 @@ const MyGlobe = () => {
       <Globe
         ref={globeEl}
         globeImageUrl="//unpkg.com/three-globe/example/img/earth-blue-marble.jpg"
-        // NEW: Adds 3D terrain shadows when light hits it!
         bumpImageUrl="//unpkg.com/three-globe/example/img/earth-topology.png"
         backgroundImageUrl="//unpkg.com/three-globe/example/img/night-sky.png"
         onGlobeClick={({ lat, lng }) => {
@@ -392,25 +426,39 @@ const MyGlobe = () => {
         onPolygonHover={setHoveredCountry}
         polygonsTransitionDuration={300}
         onPolygonClick={handlePolygonClick}
-        htmlElementsData={places}
+        htmlElementsData={[...places, ...(issLocation ? [issLocation] : [])]}
+        // --- Give the ISS real 3D height (0.15), keep cities on the ground (0) ---
+        htmlAltitude={(d) => (d.isISS ? 0.15 : 0)}
         htmlElement={(d) => {
           const el = document.createElement("div");
-          el.innerHTML = `
-            <div class="marker-dot"></div>
-            <div class="marker-label">${d.name}</div>
-          `;
-          el.style.pointerEvents = "auto";
-          el.style.cursor = "pointer";
-          el.onclick = () => {
-            if (measureMode) {
-              handleMapClick(d.lat, d.lng);
-            } else {
+
+          if (d.isISS) {
+            el.innerHTML = `<div style="font-size: 26px; filter: drop-shadow(0px 0px 5px #00ffff); cursor: pointer;">🛰️</div>`;
+            el.style.pointerEvents = "auto";
+            el.onclick = () => {
               globeEl.current.pointOfView(
-                { lat: d.lat, lng: d.lng, altitude: 0.5 },
+                { lat: d.lat, lng: d.lng, altitude: 0.8 },
                 1000,
               );
-            }
-          };
+            };
+          } else {
+            el.innerHTML = `
+              <div class="marker-dot"></div>
+              <div class="marker-label">${d.name}</div>
+            `;
+            el.style.pointerEvents = "auto";
+            el.style.cursor = "pointer";
+            el.onclick = () => {
+              if (measureMode) {
+                handleMapClick(d.lat, d.lng);
+              } else {
+                globeEl.current.pointOfView(
+                  { lat: d.lat, lng: d.lng, altitude: 0.5 },
+                  1000,
+                );
+              }
+            };
+          }
           return el;
         }}
         ringsData={measurePoints}
