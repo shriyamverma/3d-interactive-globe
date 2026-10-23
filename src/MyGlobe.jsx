@@ -71,24 +71,35 @@ const MyGlobe = () => {
 
         if (ambientLight && directionalLight) {
           if (sunlight) {
-            ambientLight.intensity = 0.05;
-            directionalLight.intensity = 2;
+            // 1. Drop the night side to near-pitch black (just a tiny hint of moonlight)
+            ambientLight.intensity = 0.02;
+            ambientLight.color.setHex(0x222233);
+
+            // 2. Crank up the Sun's brightness to create a sharp shadow line
+            directionalLight.intensity = 4;
+            directionalLight.color.setHex(0xffffee);
+
             const now = new Date();
             const utcHour = now.getUTCHours() + now.getUTCMinutes() / 60;
             const sunLng = 180 - utcHour * 15;
             const month = now.getUTCMonth();
             const sunLat = -23.5 * Math.cos(((month + 0.5) * Math.PI) / 6);
+
             const phi = (90 - sunLat) * (Math.PI / 180);
             const theta = (sunLng + 90) * (Math.PI / 180);
             const r = 200;
+
             directionalLight.position.set(
               r * Math.sin(phi) * Math.cos(theta),
               r * Math.cos(phi),
               r * Math.sin(phi) * Math.sin(theta),
             );
           } else {
+            // Flat daylight mode
             ambientLight.intensity = 0.8;
+            ambientLight.color.setHex(0xffffff);
             directionalLight.intensity = 1;
+            directionalLight.color.setHex(0xffffff);
             directionalLight.position.set(1, 1, 1);
           }
         }
@@ -363,6 +374,8 @@ const MyGlobe = () => {
       <Globe
         ref={globeEl}
         globeImageUrl="//unpkg.com/three-globe/example/img/earth-blue-marble.jpg"
+        // NEW: Adds 3D terrain shadows when light hits it!
+        bumpImageUrl="//unpkg.com/three-globe/example/img/earth-topology.png"
         backgroundImageUrl="//unpkg.com/three-globe/example/img/night-sky.png"
         onGlobeClick={({ lat, lng }) => {
           if (measureMode) handleMapClick(lat, lng);
