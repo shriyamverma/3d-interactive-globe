@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import Globe from "react-globe.gl";
 import { calculateDistance, getCentroid } from "./utils";
 import { initialPlaces } from "./data";
+import { tours } from "./tours";
 import "./MyGlobe.css";
 
 const MyGlobe = () => {
@@ -25,15 +26,14 @@ const MyGlobe = () => {
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [countryInfo, setCountryInfo] = useState(null);
 
-  // Store the open-source encyclopedia data locally
   const [countryEncyclopedia, setCountryEncyclopedia] = useState([]);
-
   const [places] = useState(initialPlaces);
-
-  // ISS Tracker State
   const [issLocation, setIssLocation] = useState(null);
 
-  // Fetch data on mount
+  // --- Cinematic Tour States ---
+  const [activeTour, setActiveTour] = useState(null);
+  const [tourStep, setTourStep] = useState(0);
+
   useEffect(() => {
     fetch(
       "https://raw.githubusercontent.com/vasturiano/react-globe.gl/master/example/datasets/ne_110m_admin_0_countries.geojson",
@@ -48,7 +48,6 @@ const MyGlobe = () => {
       .then((data) => setCountryEncyclopedia(data));
   }, []);
 
-  // Live ISS Fetcher
   useEffect(() => {
     const fetchISS = async () => {
       try {
@@ -72,17 +71,16 @@ const MyGlobe = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Auto-rotation toggle
   useEffect(() => {
     if (globeEl.current && globeEl.current.controls()) {
       const controls = globeEl.current.controls();
-      controls.autoRotate = autoRotate;
+      // Disable auto-rotate when a tour is active
+      controls.autoRotate = autoRotate && !activeTour;
       controls.autoRotateSpeed = 0.5;
       controls.enableDamping = true;
     }
-  }, [autoRotate]);
+  }, [autoRotate, activeTour]);
 
-  // Solar Illumination
   useEffect(() => {
     const timeout = setTimeout(() => {
       if (globeEl.current) {
@@ -129,9 +127,20 @@ const MyGlobe = () => {
     return () => clearTimeout(timeout);
   }, [sunlight]);
 
-  // Handle Map Clicks for measuring
+  // --- Tour Camera Logic ---
+  useEffect(() => {
+    if (activeTour && globeEl.current) {
+      const stop = activeTour.stops[tourStep];
+      // Fly the camera smoothly to the current tour stop (2500ms duration)
+      globeEl.current.pointOfView(
+        { lat: stop.lat, lng: stop.lng, altitude: 0.6 },
+        2500,
+      );
+    }
+  }, [activeTour, tourStep]);
+
   const handleMapClick = (lat, lng) => {
-    if (!measureMode) return;
+    if (!measureMode || activeTour) return;
 
     if (measurePoints.length === 0 || measurePoints.length === 2) {
       setMeasurePoints([{ lat, lng }]);
@@ -146,6 +155,8 @@ const MyGlobe = () => {
   };
 
   const showCountryInfo = (properties) => {
+    if (activeTour) return; // Disable info panel during tours
+
     const countryName = properties.ADMIN || properties.NAME || "Unknown";
     setIsPanelOpen(true);
 
@@ -206,16 +217,19 @@ const MyGlobe = () => {
       return;
     }
 
+    // Cancel tour if searching
+    if (activeTour) endTour();
+
     const country = countries.find((c) => c.properties.ADMIN === countryName);
     if (country) {
       const { lat, lng } = getCentroid(country.geometry);
       globeEl.current.pointOfView({ lat, lng, altitude: 0.8 }, 1000);
-
       showCountryInfo(country.properties);
     }
   };
 
   const handlePolygonClick = (polygon, event, { lat, lng }) => {
+    if (activeTour) return;
     if (measureMode) {
       handleMapClick(lat, lng);
       return;
@@ -225,11 +239,48 @@ const MyGlobe = () => {
     showCountryInfo(polygon.properties);
   };
 
+  // --- Tour Handlers ---
+  const handleTourSelect = (e) => {
+    const tourId = e.target.value;
+    if (!tourId) {
+      endTour();
+      return;
+    }
+
+    const selected = tours.find((t) => t.id === tourId);
+    if (selected) {
+      setIsPanelOpen(false);
+      setMeasureMode(false);
+      setSearchQuery("");
+      setActiveTour(selected);
+      setTourStep(0);
+    }
+  };
+
+  const nextTourStep = () => {
+    if (tourStep < activeTour.stops.length - 1) {
+      setTourStep((prev) => prev + 1);
+    } else {
+      endTour();
+    }
+  };
+
+  const prevTourStep = () => {
+    if (tourStep > 0) setTourStep((prev) => prev - 1);
+  };
+
+  const endTour = () => {
+    setActiveTour(null);
+    setTourStep(0);
+    globeEl.current.pointOfView({ altitude: 2.5 }, 1500);
+  };
+
   const handleReset = () => {
     setSearchQuery("");
     setMeasurePoints([]);
     setMeasureDistance(null);
     setIsPanelOpen(false);
+    endTour(); // Clear tour on reset
     globeEl.current.pointOfView({ altitude: 2.5 }, 1000);
   };
 
@@ -238,6 +289,7 @@ const MyGlobe = () => {
     setMeasurePoints([]);
     setMeasureDistance(null);
     setIsPanelOpen(false);
+    if (activeTour) endTour();
     if (!measureMode) setAutoRotate(false);
   };
 
@@ -251,7 +303,6 @@ const MyGlobe = () => {
         >
           ×
         </button>
-
         {countryInfo ? (
           <div style={{ marginTop: "30px" }}>
             {countryInfo.flag && (
@@ -264,32 +315,26 @@ const MyGlobe = () => {
             <h2 style={{ marginTop: 0, marginBottom: "20px" }}>
               {countryInfo.name}
             </h2>
-
             <div className="info-item">
               <label>Capital</label>
               <div>{countryInfo.capital}</div>
             </div>
-
             <div className="info-item">
               <label>Region</label>
               <div>{countryInfo.region}</div>
             </div>
-
             <div className="info-item">
               <label>Population</label>
               <div>{countryInfo.population}</div>
             </div>
-
             <div className="info-item">
               <label>Currencies</label>
               <div>{countryInfo.currencies}</div>
             </div>
-
             <div className="info-item">
               <label>Languages</label>
               <div>{countryInfo.languages}</div>
             </div>
-
             {countryInfo.error && (
               <div
                 style={{
@@ -339,12 +384,69 @@ const MyGlobe = () => {
         </div>
       )}
 
+      {/* --- Guided Tour UI Panel --- */}
+      {activeTour && (
+        <div className="tour-panel">
+          <div className="tour-header">
+            <span>{activeTour.name}</span>
+            <span>
+              {tourStep + 1} / {activeTour.stops.length}
+            </span>
+          </div>
+
+          {activeTour.stops[tourStep].image && (
+            <div className="tour-image-container">
+              <a
+                href={activeTour.stops[tourStep].link}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Read more on Wikipedia"
+              >
+                <img
+                  src={activeTour.stops[tourStep].image}
+                  alt={activeTour.stops[tourStep].name}
+                  className="tour-image"
+                />
+                <div className="tour-image-hint">
+                  <small>↗ Read on Wikipedia</small>
+                </div>
+              </a>
+            </div>
+          )}
+
+          <h3>{activeTour.stops[tourStep].name}</h3>
+          <p>{activeTour.stops[tourStep].description}</p>
+
+          <div className="tour-controls">
+            <button className="tour-btn" onClick={endTour}>
+              Exit Tour
+            </button>
+            <button
+              className="tour-btn"
+              onClick={prevTourStep}
+              disabled={tourStep === 0}
+            >
+              Previous
+            </button>
+            <button
+              className="tour-btn tour-btn-primary"
+              onClick={nextTourStep}
+            >
+              {tourStep === activeTour.stops.length - 1
+                ? "Finish"
+                : "Next Stop"}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Control Panel */}
       <div className="control-panel">
         <select
           value={searchQuery}
           onChange={handleSearch}
           className="panel-element"
+          disabled={activeTour}
         >
           <option value="">Search Country...</option>
           {[...countries]
@@ -358,9 +460,25 @@ const MyGlobe = () => {
             ))}
         </select>
 
+        {/* --- Tour Dropdown --- */}
+        <select
+          value={activeTour ? activeTour.id : ""}
+          onChange={handleTourSelect}
+          className="panel-element"
+          style={{ color: activeTour ? "#ad8c00" : "inherit" }}
+        >
+          <option value=""> 🎬 Guided Tours... </option>
+          {tours.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+            </option>
+          ))}
+        </select>
+
         <button
           onClick={() => setAutoRotate(!autoRotate)}
           className="panel-element"
+          disabled={activeTour}
         >
           {autoRotate ? "Pause Rotation" : "Start Rotation"}
         </button>
@@ -379,14 +497,15 @@ const MyGlobe = () => {
         <button
           onClick={toggleMeasureMode}
           className={`panel-element ${measureMode ? "active-measure" : ""}`}
+          disabled={activeTour}
         >
           {measureMode ? "Stop Measuring" : "Measure Distance"}
         </button>
 
-        {/* --- Find ISS Button --- */}
         <button
           onClick={() => {
             if (issLocation) {
+              if (activeTour) endTour();
               globeEl.current.pointOfView(
                 { lat: issLocation.lat, lng: issLocation.lng, altitude: 0.8 },
                 1000,
@@ -426,8 +545,14 @@ const MyGlobe = () => {
         onPolygonHover={setHoveredCountry}
         polygonsTransitionDuration={300}
         onPolygonClick={handlePolygonClick}
-        htmlElementsData={[...places, ...(issLocation ? [issLocation] : [])]}
-        // --- Give the ISS real 3D height (0.15), keep cities on the ground (0) ---
+        // --- Combine cities, ISS, AND active tour stops ---
+        htmlElementsData={[
+          ...places,
+          ...(issLocation ? [issLocation] : []),
+          ...(activeTour
+            ? activeTour.stops.map((stop) => ({ ...stop, isTourStop: true }))
+            : []),
+        ]}
         htmlAltitude={(d) => (d.isISS ? 0.15 : 0)}
         htmlElement={(d) => {
           const el = document.createElement("div");
@@ -436,22 +561,29 @@ const MyGlobe = () => {
             el.innerHTML = `<div style="font-size: 26px; filter: drop-shadow(0px 0px 5px #00ffff); cursor: pointer;">🛰️</div>`;
             el.style.pointerEvents = "auto";
             el.onclick = () => {
+              if (activeTour) endTour();
               globeEl.current.pointOfView(
                 { lat: d.lat, lng: d.lng, altitude: 0.8 },
                 1000,
               );
             };
-          } else {
+          }
+          // --- Custom styling for active tour stops ---
+          else if (d.isTourStop) {
+            const isActive = activeTour.stops[tourStep].name === d.name;
             el.innerHTML = `
-              <div class="marker-dot"></div>
-              <div class="marker-label">${d.name}</div>
+              <div class="marker-dot" style="background-color: ${isActive ? "#2ecc71" : "#ffcc00"}; box-shadow: 0 0 15px ${isActive ? "#2ecc71" : "#ffcc00"}; transform: scale(${isActive ? 1.5 : 1});"></div>
+              <div class="marker-label" style="color: ${isActive ? "#2ecc71" : "white"}; font-weight: ${isActive ? "bold" : "normal"}; text-shadow: 0 0 5px black;">${d.name}</div>
             `;
+          } else {
+            el.innerHTML = `<div class="marker-dot"></div><div class="marker-label">${d.name}</div>`;
             el.style.pointerEvents = "auto";
             el.style.cursor = "pointer";
             el.onclick = () => {
               if (measureMode) {
                 handleMapClick(d.lat, d.lng);
               } else {
+                if (activeTour) endTour();
                 globeEl.current.pointOfView(
                   { lat: d.lat, lng: d.lng, altitude: 0.5 },
                   1000,

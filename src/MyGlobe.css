@@ -175,3 +175,127 @@
   font-size: 15px;
   line-height: 1.4;
 }
+
+/* --- Guided Tour Panel --- */
+.tour-panel {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(20, 20, 30, 0.85);
+  backdrop-filter: blur(12px);
+  padding: 20px 30px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  text-align: center;
+  z-index: 20;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  width: 450px;
+  max-width: 90vw;
+  transition: all 0.3s ease-in-out;
+}
+
+.tour-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  font-size: 14px;
+  color: #ffcc00;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.tour-panel h3 {
+  margin: 0 0 10px 0;
+  font-size: 24px;
+  text-shadow: 1px 1px 2px black;
+}
+
+.tour-panel p {
+  font-size: 15px;
+  line-height: 1.5;
+  margin-bottom: 20px;
+  color: #e0e0e0;
+}
+
+.tour-controls {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+}
+
+.tour-btn {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  padding: 10px;
+  font-size: 15px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tour-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.tour-btn-primary {
+  background: rgba(46, 204, 113, 0.2);
+  border-color: #2ecc71;
+  color: #2ecc71;
+  font-weight: bold;
+}
+
+.tour-btn-primary:hover {
+  background: rgba(46, 204, 113, 0.4);
+}
+
+/* --- Clickable Tour Image --- */
+.tour-image-container {
+  position: relative;
+  margin-bottom: 15px;
+  border-radius: 8px;
+  overflow: hidden;
+  /* border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4); */
+}
+
+.tour-image {
+  width: 100%;
+  height: 180px;
+  object-fit: contain;
+  display: block;
+  transition:
+    transform 0.3s ease,
+    filter 0.3s ease;
+  cursor: pointer;
+}
+
+/* Dim and zoom the image slightly when hovered */
+.tour-image-container:hover .tour-image {
+  transform: scale(1.05);
+  filter: brightness(0.7);
+}
+
+/* Wikipedia hint overlay that appears on hover */
+.tour-image-hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-weight: bold;
+  font-size: 14px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none; /* Lets clicks pass through to the link */
+}
+
+.tour-image-container:hover .tour-image-hint {
+  opacity: 1;
+}
