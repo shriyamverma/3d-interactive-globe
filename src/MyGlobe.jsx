@@ -35,6 +35,10 @@ const MyGlobe = () => {
   const [countryEncyclopedia, setCountryEncyclopedia] = useState([]);
   const [places] = useState(initialPlaces);
   const [issLocation, setIssLocation] = useState(null);
+  const poles = [
+    { name: "N", lat: 90, lng: 0, isPole: true },
+    { name: "S", lat: -90, lng: 0, isPole: true },
+  ];
 
   // --- Cinematic Tour States ---
   const [activeTour, setActiveTour] = useState(null);
@@ -336,7 +340,6 @@ const MyGlobe = () => {
                 ? "✓ Textures Loaded"
                 : "Rendering 3D Environment..."}
             </span>
-            {/* --- NEW: Image Preload Tracker --- */}
             <span style={{ color: isImagesLoaded ? "#2ecc71" : "#ffcc00" }}>
               {isImagesLoaded ? "✓ Media Loaded" : "Caching Tour Images..."}
             </span>
@@ -613,12 +616,17 @@ const MyGlobe = () => {
         // --- Combine cities, ISS, AND active tour stops ---
         htmlElementsData={[
           ...places,
+          ...poles,
           ...(issLocation ? [issLocation] : []),
           ...(activeTour
             ? activeTour.stops.map((stop) => ({ ...stop, isTourStop: true }))
             : []),
         ]}
-        htmlAltitude={(d) => (d.isISS ? 0.15 : 0)}
+        htmlAltitude={(d) => {
+          if (d.isISS) return 0.15;
+          if (d.isPole) return 0.02;
+          return 0;
+        }}
         htmlElement={(d) => {
           const el = document.createElement("div");
 
@@ -632,9 +640,16 @@ const MyGlobe = () => {
                 1000,
               );
             };
-          }
-          // --- Custom styling for active tour stops ---
-          else if (d.isTourStop) {
+          } else if (d.isPole) {
+            el.innerHTML = `<div style="
+              font-size: 28px; 
+              font-weight: bold; 
+              color: rgba(255, 255, 255, 0.6); 
+              text-shadow: 0 0 15px #00ffff;
+              pointer-events: none;
+              user-select: none;
+            ">${d.name}</div>`;
+          } else if (d.isTourStop) {
             const isActive = activeTour.stops[tourStep].name === d.name;
             el.innerHTML = `
               <div class="marker-dot" style="background-color: ${isActive ? "#2ecc71" : "#ffcc00"}; box-shadow: 0 0 15px ${isActive ? "#2ecc71" : "#ffcc00"}; transform: scale(${isActive ? 1.5 : 1});"></div>
