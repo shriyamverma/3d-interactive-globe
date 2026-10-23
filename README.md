@@ -2,6 +2,11 @@
 
 An interactive 3D web application built with React and `react-globe.gl`. This project renders a beautiful, fully interactive Earth with cinematic controls, real-time solar illumination, a precise distance measuring tool, live ISS tracking, cinematic guided tours and an instant country encyclopedia.
 
+<div style="display: flex; gap: 5px;">
+  <img src="public/preview1.png" alt="First" width="50%"/>
+  <img src="public/preview2.png" alt="Second" width="50%"/>
+</div>
+
 ## ✨ Features
 
 - **Cinematic 3D Environment**: High-performance Three.js/WebGL globe with auto-rotation, atmospheric glow, and a beautiful starscape background.
