@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import Globe from "react-globe.gl";
 import { calculateDistance, getCentroid } from "./utils";
 import { initialPlaces } from "./data";
-import "./MyGlobe.css"; // Import styles
+import "./MyGlobe.css";
 
 const MyGlobe = () => {
   const globeEl = useRef();
@@ -21,15 +21,30 @@ const MyGlobe = () => {
   const [measurePoints, setMeasurePoints] = useState([]);
   const [measureDistance, setMeasureDistance] = useState(null);
 
+  // States for Slide-Out Info Panel
+  const [isPanelOpen, setIsPanelOpen] = useState(false);
+  const [countryInfo, setCountryInfo] = useState(null);
+
+  // --- NEW: Store the open-source encyclopedia data locally ---
+  const [countryEncyclopedia, setCountryEncyclopedia] = useState([]);
+
   const [places] = useState(initialPlaces);
 
-  // Fetch geoJSON data
+  // Fetch data on mount
   useEffect(() => {
+    // 1. Fetch Globe Borders
     fetch(
       "https://raw.githubusercontent.com/vasturiano/react-globe.gl/master/example/datasets/ne_110m_admin_0_countries.geojson",
     )
       .then((res) => res.json())
       .then((data) => setCountries(data.features));
+
+    // 2. Fetch Open-Source Country Encyclopedia (mledoze/countries)
+    fetch(
+      "https://raw.githubusercontent.com/mledoze/countries/master/countries.json",
+    )
+      .then((res) => res.json())
+      .then((data) => setCountryEncyclopedia(data));
   }, []);
 
   // Auto-rotation toggle
@@ -98,15 +113,77 @@ const MyGlobe = () => {
     }
   };
 
+  // --- NEW: INSTANT LOCAL DATA FETCHER ---
+  const showCountryInfo = (properties) => {
+    const countryName = properties.ADMIN || properties.NAME || "Unknown";
+    setIsPanelOpen(true);
+
+    const a2 = properties.ISO_A2 || properties.iso_a2;
+    const isoCode = a2 && a2 !== "-99" ? a2 : null;
+
+    // Instantly search our locally downloaded encyclopedia
+    const info = countryEncyclopedia.find(
+      (c) =>
+        (isoCode && c.cca2 === isoCode) ||
+        c.name.common === countryName ||
+        c.name.official === countryName,
+    );
+
+    // Free open-source flag CDN
+    const flagUrl = isoCode
+      ? `https://flagcdn.com/${isoCode.toLowerCase()}.svg`
+      : null;
+
+    if (info) {
+      setCountryInfo({
+        name: countryName,
+        flag: flagUrl,
+        capital:
+          info.capital && info.capital.length > 0 ? info.capital[0] : "N/A",
+        population: properties.POP_EST
+          ? properties.POP_EST.toLocaleString()
+          : "N/A",
+        region: info.region || "N/A",
+        currencies: info.currencies
+          ? Object.values(info.currencies)
+              .map((c) => c.name)
+              .join(", ")
+          : "N/A",
+        languages: info.languages
+          ? Object.values(info.languages).join(", ")
+          : "N/A",
+      });
+    } else {
+      // Fallback for tiny islands/territories missing from the encyclopedia
+      setCountryInfo({
+        name: countryName,
+        flag: flagUrl,
+        capital: "N/A",
+        region: properties.CONTINENT || "N/A",
+        population: properties.POP_EST
+          ? properties.POP_EST.toLocaleString()
+          : "N/A",
+        currencies: "N/A",
+        languages: "N/A",
+        error: "Detailed encyclopedia data missing for this specific border.",
+      });
+    }
+  };
+
   const handleSearch = (e) => {
     const countryName = e.target.value;
     setSearchQuery(countryName);
-    if (!countryName) return;
+    if (!countryName) {
+      setIsPanelOpen(false);
+      return;
+    }
 
     const country = countries.find((c) => c.properties.ADMIN === countryName);
     if (country) {
       const { lat, lng } = getCentroid(country.geometry);
       globeEl.current.pointOfView({ lat, lng, altitude: 0.8 }, 1000);
+
+      showCountryInfo(country.properties);
     }
   };
 
@@ -115,13 +192,16 @@ const MyGlobe = () => {
       handleMapClick(lat, lng);
       return;
     }
+
     globeEl.current.pointOfView({ lat, lng, altitude: 0.8 }, 1000);
+    showCountryInfo(polygon.properties);
   };
 
   const handleReset = () => {
     setSearchQuery("");
     setMeasurePoints([]);
     setMeasureDistance(null);
+    setIsPanelOpen(false);
     globeEl.current.pointOfView({ altitude: 2.5 }, 1000);
   };
 
@@ -129,11 +209,75 @@ const MyGlobe = () => {
     setMeasureMode(!measureMode);
     setMeasurePoints([]);
     setMeasureDistance(null);
+    setIsPanelOpen(false);
     if (!measureMode) setAutoRotate(false);
   };
 
   return (
     <div className="globe-container">
+      {/* Slide-Out Info Panel */}
+      <div className={`info-panel ${isPanelOpen ? "open" : ""}`}>
+        <button
+          className="info-panel-close"
+          onClick={() => setIsPanelOpen(false)}
+        >
+          ×
+        </button>
+
+        {countryInfo ? (
+          <div style={{ marginTop: "30px" }}>
+            {countryInfo.flag && (
+              <img
+                src={countryInfo.flag}
+                alt={`${countryInfo.name} flag`}
+                className="flag"
+              />
+            )}
+            <h2 style={{ marginTop: 0, marginBottom: "20px" }}>
+              {countryInfo.name}
+            </h2>
+
+            <div className="info-item">
+              <label>Capital</label>
+              <div>{countryInfo.capital}</div>
+            </div>
+
+            <div className="info-item">
+              <label>Region</label>
+              <div>{countryInfo.region}</div>
+            </div>
+
+            <div className="info-item">
+              <label>Population</label>
+              <div>{countryInfo.population}</div>
+            </div>
+
+            <div className="info-item">
+              <label>Currencies</label>
+              <div>{countryInfo.currencies}</div>
+            </div>
+
+            <div className="info-item">
+              <label>Languages</label>
+              <div>{countryInfo.languages}</div>
+            </div>
+
+            {countryInfo.error && (
+              <div
+                style={{
+                  color: "coral",
+                  marginTop: "20px",
+                  fontSize: "12px",
+                  fontStyle: "italic",
+                }}
+              >
+                * {countryInfo.error}
+              </div>
+            )}
+          </div>
+        ) : null}
+      </div>
+
       {/* Measure UI Panel */}
       {measureMode && (
         <div className="measure-panel">
@@ -192,28 +336,24 @@ const MyGlobe = () => {
         >
           {autoRotate ? "Pause Rotation" : "Start Rotation"}
         </button>
-
         <button
           onClick={() => setShowCountries(!showCountries)}
           className="panel-element"
         >
           {showCountries ? "Hide Borders" : "Show Borders"}
         </button>
-
         <button
           onClick={() => setSunlight(!sunlight)}
           className="panel-element"
         >
           {sunlight ? "Disable Sunlight" : "Enable Sunlight"}
         </button>
-
         <button
           onClick={toggleMeasureMode}
           className={`panel-element ${measureMode ? "active-measure" : ""}`}
         >
           {measureMode ? "Stop Measuring" : "Measure Distance"}
         </button>
-
         <button onClick={handleReset} className="panel-element btn-reset">
           Reset View
         </button>
@@ -238,12 +378,6 @@ const MyGlobe = () => {
         polygonStrokeColor={() => "#dddddd"}
         onPolygonHover={setHoveredCountry}
         polygonsTransitionDuration={300}
-        polygonLabel={({ properties: d }) => `
-          <div style="background: rgba(0, 0, 0, 0.8); padding: 12px; border-radius: 6px; color: white; font-family: sans-serif;">
-            <b style="font-size: 16px;">${d.ADMIN}</b> <br />
-            Population: ${(d.POP_EST / 1e6).toFixed(1)}M
-          </div>
-        `}
         onPolygonClick={handlePolygonClick}
         htmlElementsData={places}
         htmlElement={(d) => {

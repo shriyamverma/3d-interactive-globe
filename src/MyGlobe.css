@@ -110,3 +110,68 @@
   transform: translateX(-30%);
   text-shadow: 1px 1px 2px black;
 }
+
+/* --- Slide-Out Info Panel --- */
+.info-panel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 320px;
+  background-color: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(10px);
+  color: white;
+  z-index: 20;
+  padding: 30px;
+  box-sizing: border-box;
+  transform: translateX(-100%); /* Hides it off-screen to the left */
+  transition: transform 0.3s ease-in-out;
+  font-family: sans-serif;
+  box-shadow: 2px 0 15px rgba(0, 0, 0, 0.5);
+  overflow-y: auto;
+}
+
+.info-panel.open {
+  transform: translateX(0); /* Slides it in */
+}
+
+.info-panel-close {
+  position: absolute;
+  top: 15px;
+  right: 20px;
+  background: none;
+  border: none;
+  color: #ccc;
+  font-size: 28px;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.info-panel-close:hover {
+  color: white;
+}
+
+.info-panel img.flag {
+  width: 100%;
+  border-radius: 6px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.info-item {
+  margin-bottom: 15px;
+}
+
+.info-item label {
+  color: #ffcc00;
+  font-weight: bold;
+  font-size: 12px;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.info-item div {
+  font-size: 15px;
+  line-height: 1.4;
+}
