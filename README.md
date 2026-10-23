@@ -1,16 +1,57 @@
-# React + Vite
+# 🌍 Interactive 3D React Globe
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A showcase-quality, interactive 3D web application built with React and `react-globe.gl`. This project renders a beautiful, fully interactive Earth with cinematic controls, real-time solar illumination, a precise distance measuring tool, and an instant country encyclopedia.
 
-Currently, two official plugins are available:
+## ✨ Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **Cinematic 3D Environment**: High-performance Three.js/WebGL globe with auto-rotation, atmospheric glow, and a beautiful starscape background.
+- **Slide-Out Encyclopedia**: Click any country (or search via the dropdown) to instantly slide out a sleek, glassmorphic info panel. Displays the country's flag, capital, population, languages, and currencies with zero API latency.
+- **Interactive Distance Measure Tool**: Toggle measure mode to click any two points on the Earth. Draws a glowing 3D flight arc, radar rings, and calculates the exact real-world distance in kilometers using the Haversine formula.
+- **Real-Time Solar Illumination**: Toggle sunlight to simulate the exact real-world day/night cycle based on current UTC time. Darkens the night side and adds a realistic sun reflection to the oceans.
+- **Country Search & Highlighting**: Dropdown menu to search for any country. Calculates the centroid of the country's geometry and automatically flies the camera to it.
+- **Custom Map Markers**: HTML-based glowing city markers (New York, London, Tokyo, Sydney, Delhi, Bangalore, Bangkok, Cairo).
 
-## React Compiler
+## 🛠 Tech Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Framework**: [React](https://reactjs.org/) (via [Vite](https://vitejs.dev/))
+- **3D Globe**: [react-globe.gl](https://globe.gl/react/) (built on Three.js)
+- **Styling**: Plain CSS with glassmorphic UI principles
+- **Data Sources**:
+  - Borders: Open-source GeoJSON map data.
+  - Country Info: Local fetching of the `mledoze/countries` open-source JSON encyclopedia (bypasses CORS and API rate limits).
+  - Flags: [FlagCDN](https://flagcdn.com/)
 
-## Expanding the ESLint configuration
+## 📂 Project Structure
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+The project has been refactored into a clean, modular structure:
+
+```text
+src/
+├── data.js         # Static data configurations (e.g., custom city coordinates)
+├── utils.js        # Helper functions (Haversine distance math, centroid calculations)
+├── MyGlobe.css     # UI and layout styling
+├── MyGlobe.jsx     # Main React component and 3D globe logic
+├── main.jsx        # App entry point
+```
+
+## 🚀 Getting Started
+
+To run this project locally, follow these steps:
+
+1. **Clone or Download the repository**
+2. **Install Dependencies**:
+   Open your terminal in the project directory and run:
+   ```bash
+   npm install
+   ```
+   _(Ensure you have `react-globe.gl` installed: `npm install react-globe.gl`)_
+3. **Start the Development Server**:
+   ```bash
+   npm run dev
+   ```
+4. **Open in Browser**:
+   Navigate to `http://localhost:5173` (or the port Vite provides) to interact with the globe!
+
+---
+
+_Built with React and Three.js_
