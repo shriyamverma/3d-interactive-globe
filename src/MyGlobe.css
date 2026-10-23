@@ -299,3 +299,59 @@
 .tour-image-container:hover .tour-image-hint {
   opacity: 1;
 }
+
+/* --- Full Screen Loader --- */
+.loader-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: #050508; /* Deep space background */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  color: white;
+}
+
+.loader-spinner {
+  font-size: 60px;
+  animation: spin 1.5s linear infinite;
+  filter: drop-shadow(0 0 15px rgba(0, 255, 255, 0.5));
+  margin-bottom: 20px;
+}
+
+.loader-text {
+  margin: 0;
+  font-size: 24px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #ffffff;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+.loader-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 15px;
+  font-size: 13px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  gap: 5px;
+  opacity: 0.8;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(180deg) scale(1.1);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}

@@ -10,12 +10,18 @@ const MyGlobe = () => {
 
   const [countries, setCountries] = useState([]);
   const [hoveredCountry, setHoveredCountry] = useState(null);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const [isGlobeReady, setIsGlobeReady] = useState(false);
+  const [isImagesLoaded, setIsImagesLoaded] = useState(false);
+
+  const isLoading = !isDataLoaded || !isGlobeReady || !isImagesLoaded;
 
   // States for our control panel
   const [autoRotate, setAutoRotate] = useState(true);
   const [showCountries, setShowCountries] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [sunlight, setSunlight] = useState(false);
+  const [showLabels, setShowLabels] = useState(false);
 
   // States for Distance Measure Tool
   const [measureMode, setMeasureMode] = useState(false);
@@ -34,18 +40,40 @@ const MyGlobe = () => {
   const [activeTour, setActiveTour] = useState(null);
   const [tourStep, setTourStep] = useState(0);
 
+  // Fetch data and preload images on mount
   useEffect(() => {
-    fetch(
-      "https://raw.githubusercontent.com/vasturiano/react-globe.gl/master/example/datasets/ne_110m_admin_0_countries.geojson",
-    )
-      .then((res) => res.json())
-      .then((data) => setCountries(data.features));
+    // 1. Fetch JSON Data
+    Promise.all([
+      fetch(
+        "https://raw.githubusercontent.com/vasturiano/react-globe.gl/master/example/datasets/ne_110m_admin_0_countries.geojson",
+      ).then((res) => res.json()),
+      fetch(
+        "https://raw.githubusercontent.com/mledoze/countries/master/countries.json",
+      ).then((res) => res.json()),
+    ]).then(([geoData, encyclopediaData]) => {
+      setCountries(geoData.features);
+      setCountryEncyclopedia(encyclopediaData);
+      setIsDataLoaded(true);
+    });
 
-    fetch(
-      "https://raw.githubusercontent.com/mledoze/countries/master/countries.json",
-    )
-      .then((res) => res.json())
-      .then((data) => setCountryEncyclopedia(data));
+    // 2. Preload Tour Images in the background
+    // Flatten the tours array to get a single array of all image URLs
+    const imageUrls = tours
+      .flatMap((tour) => tour.stops.map((stop) => stop.image))
+      .filter(Boolean);
+
+    const imagePromises = imageUrls.map((url) => {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.src = url;
+        img.onload = resolve; // Resolves when downloaded
+        img.onerror = resolve; // Resolves even if an image fails, so the app doesn't break
+      });
+    });
+
+    Promise.all(imagePromises).then(() => {
+      setIsImagesLoaded(true); // Images are fully cached!
+    });
   }, []);
 
   useEffect(() => {
@@ -295,6 +323,27 @@ const MyGlobe = () => {
 
   return (
     <div className="globe-container">
+      {isLoading && (
+        <div className="loader-overlay">
+          <div className="loader-spinner">🌍</div>
+          <h2 className="loader-text">Initializing Earth...</h2>
+          <div className="loader-status">
+            <span style={{ color: isDataLoaded ? "#2ecc71" : "#ffcc00" }}>
+              {isDataLoaded ? "✓ Data Loaded" : "Downloading Map Data..."}
+            </span>
+            <span style={{ color: isGlobeReady ? "#2ecc71" : "#ffcc00" }}>
+              {isGlobeReady
+                ? "✓ Textures Loaded"
+                : "Rendering 3D Environment..."}
+            </span>
+            {/* --- NEW: Image Preload Tracker --- */}
+            <span style={{ color: isImagesLoaded ? "#2ecc71" : "#ffcc00" }}>
+              {isImagesLoaded ? "✓ Media Loaded" : "Caching Tour Images..."}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Slide-Out Info Panel */}
       <div className={`info-panel ${isPanelOpen ? "open" : ""}`}>
         <button
@@ -489,6 +538,12 @@ const MyGlobe = () => {
           {showCountries ? "Hide Borders" : "Show Borders"}
         </button>
         <button
+          onClick={() => setShowLabels(!showLabels)}
+          className="panel-element"
+        >
+          {showLabels ? "Hide Country Names" : "Show Country Names"}
+        </button>
+        <button
           onClick={() => setSunlight(!sunlight)}
           className="panel-element"
         >
@@ -527,6 +582,7 @@ const MyGlobe = () => {
       {/* 3D Globe */}
       <Globe
         ref={globeEl}
+        onGlobeReady={() => setIsGlobeReady(true)}
         globeImageUrl="//unpkg.com/three-globe/example/img/earth-blue-marble.jpg"
         bumpImageUrl="//unpkg.com/three-globe/example/img/earth-topology.png"
         backgroundImageUrl="//unpkg.com/three-globe/example/img/night-sky.png"
@@ -544,6 +600,15 @@ const MyGlobe = () => {
         polygonStrokeColor={() => "#dddddd"}
         onPolygonHover={setHoveredCountry}
         polygonsTransitionDuration={300}
+        labelsData={showLabels ? countries : []}
+        labelLat={(d) => getCentroid(d.geometry).lat}
+        labelLng={(d) => getCentroid(d.geometry).lng}
+        labelText={(d) => d.properties.ADMIN}
+        labelSize={1.2}
+        labelDotRadius={0.3}
+        labelColor={() => "rgb(231, 244, 207)"}
+        labelResolution={2}
+        labelAltitude={0.02}
         onPolygonClick={handlePolygonClick}
         // --- Combine cities, ISS, AND active tour stops ---
         htmlElementsData={[
