@@ -4,7 +4,6 @@ import Globe from "react-globe.gl";
 const MyGlobe = () => {
   const globeEl = useRef();
 
-  // FIX: Initialized as an empty array instead of an object
   const [countries, setCountries] = useState([]);
   const [hoveredCountry, setHoveredCountry] = useState(null);
 
@@ -13,6 +12,11 @@ const MyGlobe = () => {
   const [showCountries, setShowCountries] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [sunlight, setSunlight] = useState(false);
+
+  // Distance Measure Tool ---
+  const [measureMode, setMeasureMode] = useState(false);
+  const [measurePoints, setMeasurePoints] = useState([]);
+  const [measureDistance, setMeasureDistance] = useState(null);
 
   const [places, setPlaces] = useState([
     { name: "New York", lat: 40.7128, lng: -74.006 },
@@ -32,7 +36,6 @@ const MyGlobe = () => {
 
   // Effect to handle auto-rotation toggle
   useEffect(() => {
-    // Adding a small safety check to ensure the globe controls exist before tweaking them
     if (globeEl.current && globeEl.current.controls()) {
       const controls = globeEl.current.controls();
       controls.autoRotate = autoRotate;
@@ -41,14 +44,11 @@ const MyGlobe = () => {
     }
   }, [autoRotate]);
 
-  // --- Solar Illumination ---
+  // --- Solar Illumination (Stub from previous step) ---
   useEffect(() => {
-    // We use a small timeout to ensure the 3D scene has fully loaded
     const timeout = setTimeout(() => {
       if (globeEl.current) {
         const scene = globeEl.current.scene();
-
-        // Find the default lights created by the library
         const ambientLight = scene.children.find(
           (c) => c.type === "AmbientLight",
         );
@@ -58,31 +58,22 @@ const MyGlobe = () => {
 
         if (ambientLight && directionalLight) {
           if (sunlight) {
-            // 1. Darken the ambient light (plunges the dark side into shadow)
             ambientLight.intensity = 0.05;
-            directionalLight.intensity = 2; // Make the sun brighter
-
-            // 2. Calculate real-time sun position
+            directionalLight.intensity = 2;
             const now = new Date();
             const utcHour = now.getUTCHours() + now.getUTCMinutes() / 60;
-            // The sun moves 15 degrees of longitude per hour
             const sunLng = 180 - utcHour * 15;
-            // Approximate sun latitude based on the month (seasons)
             const month = now.getUTCMonth();
             const sunLat = -23.5 * Math.cos(((month + 0.5) * Math.PI) / 6);
-
-            // 3. Convert Lat/Lng to 3D space (Spherical Coordinates)
             const phi = (90 - sunLat) * (Math.PI / 180);
             const theta = (sunLng + 90) * (Math.PI / 180);
-            const r = 200; // Distance of the light source
-
+            const r = 200;
             directionalLight.position.set(
               r * Math.sin(phi) * Math.cos(theta),
               r * Math.cos(phi),
               r * Math.sin(phi) * Math.sin(theta),
             );
           } else {
-            // Reset to bright, flat daylight mode
             ambientLight.intensity = 0.8;
             directionalLight.intensity = 1;
             directionalLight.position.set(1, 1, 1);
@@ -90,9 +81,41 @@ const MyGlobe = () => {
         }
       }
     }, 100);
-
     return () => clearTimeout(timeout);
   }, [sunlight]);
+
+  // Calculate distance (Haversine formula) ---
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371; // Earth's radius in kilometers
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return Math.round(R * c); // Distance in km
+  };
+
+  // Handle Map Clicks for measuring ---
+  const handleMapClick = (lat, lng) => {
+    if (!measureMode) return;
+
+    if (measurePoints.length === 0 || measurePoints.length === 2) {
+      // Start a new measurement
+      setMeasurePoints([{ lat, lng }]);
+      setMeasureDistance(null);
+    } else if (measurePoints.length === 1) {
+      // Complete the measurement
+      const p1 = measurePoints[0];
+      const p2 = { lat, lng };
+      setMeasurePoints([p1, p2]);
+      const dist = calculateDistance(p1.lat, p1.lng, p2.lat, p2.lng);
+      setMeasureDistance(dist);
+    }
+  };
 
   // Helper to find the center of a country to zoom to
   const getCentroid = (geometry) => {
@@ -112,7 +135,6 @@ const MyGlobe = () => {
     return { lat: (minLat + maxLat) / 2, lng: (minLng + maxLng) / 2 };
   };
 
-  // Search Handler
   const handleSearch = (e) => {
     const countryName = e.target.value;
     setSearchQuery(countryName);
@@ -125,16 +147,31 @@ const MyGlobe = () => {
     }
   };
 
+  // Updated to support Measure Mode
   const handlePolygonClick = (polygon, event, { lat, lng }) => {
+    if (measureMode) {
+      handleMapClick(lat, lng);
+      return;
+    }
     globeEl.current.pointOfView({ lat, lng, altitude: 0.8 }, 1000);
   };
 
   const handleReset = () => {
-    setSearchQuery(""); // Reset search dropdown
+    setSearchQuery("");
+    setMeasurePoints([]); // Reset distance points
+    setMeasureDistance(null);
     globeEl.current.pointOfView({ altitude: 2.5 }, 1000);
   };
 
-  // Shared styles for our control panel buttons
+  const toggleMeasureMode = () => {
+    setMeasureMode(!measureMode);
+    setMeasurePoints([]);
+    setMeasureDistance(null);
+    if (!measureMode) {
+      setAutoRotate(false); // Auto-pause rotation when trying to measure
+    }
+  };
+
   const panelElementStyle = {
     padding: "10px 15px",
     backgroundColor: "rgba(255, 255, 255, 0.8)",
@@ -160,7 +197,70 @@ const MyGlobe = () => {
         background: "black",
       }}
     >
-      {/* UI Control Panel */}
+      {/* --- UI Bottom Panel for Measure Tool --- */}
+      {measureMode && (
+        <div
+          style={{
+            position: "absolute",
+            bottom: "30px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            backgroundColor: "rgba(0,0,0,0.85)",
+            color: "white",
+            padding: "20px 30px",
+            borderRadius: "12px",
+            fontFamily: "sans-serif",
+            zIndex: 10,
+            textAlign: "center",
+            border: "1px solid #ffcc00",
+            boxShadow: "0 0 20px rgba(255, 204, 0, 0.3)",
+          }}
+        >
+          <h3 style={{ margin: "0 0 10px 0", color: "#ffcc00" }}>
+            Measure Distance
+          </h3>
+          {measurePoints.length === 0 && (
+            <p style={{ margin: 0 }}>
+              Click anywhere on the globe to set <b>Point A</b>.
+            </p>
+          )}
+          {measurePoints.length === 1 && (
+            <p style={{ margin: 0 }}>
+              Click another spot to set <b>Point B</b>.
+            </p>
+          )}
+          {measurePoints.length === 2 && (
+            <>
+              <div
+                style={{
+                  fontSize: "32px",
+                  fontWeight: "bold",
+                  margin: "10px 0",
+                }}
+              >
+                {measureDistance.toLocaleString()} km
+              </div>
+              <button
+                onClick={() => {
+                  setMeasurePoints([]);
+                  setMeasureDistance(null);
+                }}
+                style={{
+                  ...panelElementStyle,
+                  backgroundColor: "#333",
+                  color: "white",
+                  border: "1px solid #666",
+                  padding: "5px 15px",
+                }}
+              >
+                Reset Points
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Top Right UI Control Panel */}
       <div
         style={{
           position: "absolute",
@@ -211,6 +311,17 @@ const MyGlobe = () => {
           {sunlight ? "Disable Sunlight" : "Enable Sunlight"}
         </button>
 
+        {/* --- Measure Mode Toggle Button --- */}
+        <button
+          onClick={toggleMeasureMode}
+          style={{
+            ...panelElementStyle,
+            backgroundColor: measureMode ? "#ffcc00" : "rgba(255,255,255,0.8)",
+          }}
+        >
+          {measureMode ? "Stop Measuring" : "Measure Distance"}
+        </button>
+
         <button
           onClick={handleReset}
           style={{
@@ -228,6 +339,10 @@ const MyGlobe = () => {
         ref={globeEl}
         globeImageUrl="//unpkg.com/three-globe/example/img/earth-blue-marble.jpg"
         backgroundImageUrl="//unpkg.com/three-globe/example/img/night-sky.png"
+        // --- Intercept direct globe clicks for measuring oceans ---
+        onGlobeClick={({ lat, lng }) => {
+          if (measureMode) handleMapClick(lat, lng);
+        }}
         polygonsData={showCountries ? countries : []}
         polygonAltitude={(d) => (d === hoveredCountry ? 0.06 : 0.01)}
         polygonCapColor={(d) =>
@@ -256,13 +371,42 @@ const MyGlobe = () => {
           el.style.pointerEvents = "auto";
           el.style.cursor = "pointer";
           el.onclick = () => {
-            globeEl.current.pointOfView(
-              { lat: d.lat, lng: d.lng, altitude: 0.5 },
-              1000,
-            );
+            if (measureMode) {
+              handleMapClick(d.lat, d.lng);
+            } else {
+              globeEl.current.pointOfView(
+                { lat: d.lat, lng: d.lng, altitude: 0.5 },
+                1000,
+              );
+            }
           };
           return el;
         }}
+        // --- Rings at the click points ---
+        ringsData={measurePoints}
+        ringColor={() => "#ffcc00"}
+        ringMaxRadius={3}
+        ringPropagationSpeed={2}
+        ringRepeatPeriod={800}
+        // --- Glowing Arc between the two points ---
+        arcsData={
+          measurePoints.length === 2
+            ? [
+                {
+                  startLat: measurePoints[0].lat,
+                  startLng: measurePoints[0].lng,
+                  endLat: measurePoints[1].lat,
+                  endLng: measurePoints[1].lng,
+                },
+              ]
+            : []
+        }
+        arcColor={() => "#ffcc00"}
+        arcDashLength={0.4}
+        arcDashGap={0.2}
+        arcDashAnimateTime={1500}
+        arcAltitude={0.2}
+        arcStroke={1}
         showAtmosphere={true}
         atmosphereColor="lightskyblue"
         atmosphereAltitude={0.15}
