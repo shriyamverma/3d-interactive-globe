@@ -12,6 +12,7 @@ const MyGlobe = () => {
   const [autoRotate, setAutoRotate] = useState(true);
   const [showCountries, setShowCountries] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [sunlight, setSunlight] = useState(false);
 
   const [places, setPlaces] = useState([
     { name: "New York", lat: 40.7128, lng: -74.006 },
@@ -39,6 +40,59 @@ const MyGlobe = () => {
       controls.enableDamping = true;
     }
   }, [autoRotate]);
+
+  // --- Solar Illumination ---
+  useEffect(() => {
+    // We use a small timeout to ensure the 3D scene has fully loaded
+    const timeout = setTimeout(() => {
+      if (globeEl.current) {
+        const scene = globeEl.current.scene();
+
+        // Find the default lights created by the library
+        const ambientLight = scene.children.find(
+          (c) => c.type === "AmbientLight",
+        );
+        const directionalLight = scene.children.find(
+          (c) => c.type === "DirectionalLight",
+        );
+
+        if (ambientLight && directionalLight) {
+          if (sunlight) {
+            // 1. Darken the ambient light (plunges the dark side into shadow)
+            ambientLight.intensity = 0.05;
+            directionalLight.intensity = 2; // Make the sun brighter
+
+            // 2. Calculate real-time sun position
+            const now = new Date();
+            const utcHour = now.getUTCHours() + now.getUTCMinutes() / 60;
+            // The sun moves 15 degrees of longitude per hour
+            const sunLng = 180 - utcHour * 15;
+            // Approximate sun latitude based on the month (seasons)
+            const month = now.getUTCMonth();
+            const sunLat = -23.5 * Math.cos(((month + 0.5) * Math.PI) / 6);
+
+            // 3. Convert Lat/Lng to 3D space (Spherical Coordinates)
+            const phi = (90 - sunLat) * (Math.PI / 180);
+            const theta = (sunLng + 90) * (Math.PI / 180);
+            const r = 200; // Distance of the light source
+
+            directionalLight.position.set(
+              r * Math.sin(phi) * Math.cos(theta),
+              r * Math.cos(phi),
+              r * Math.sin(phi) * Math.sin(theta),
+            );
+          } else {
+            // Reset to bright, flat daylight mode
+            ambientLight.intensity = 0.8;
+            directionalLight.intensity = 1;
+            directionalLight.position.set(1, 1, 1);
+          }
+        }
+      }
+    }, 100);
+
+    return () => clearTimeout(timeout);
+  }, [sunlight]);
 
   // Helper to find the center of a country to zoom to
   const getCentroid = (geometry) => {
@@ -148,6 +202,13 @@ const MyGlobe = () => {
           style={panelElementStyle}
         >
           {showCountries ? "Hide Borders" : "Show Borders"}
+        </button>
+
+        <button
+          onClick={() => setSunlight(!sunlight)}
+          style={panelElementStyle}
+        >
+          {sunlight ? "Disable Sunlight" : "Enable Sunlight"}
         </button>
 
         <button
