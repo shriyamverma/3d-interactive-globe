@@ -13,6 +13,8 @@ import LoaderOverlay from "./components/LoaderOverlay";
 import CountryInfoPanel from "./components/CountryInfoPanel";
 import MeasurePanel from "./components/MeasurePanel";
 import TourPanel from "./components/TourPanel";
+import BrandingBadge from "./components/BrandingBadge";
+import CreatorHQPanel from "./components/CreatorHQPanel";
 
 // Assets
 import earthBlueMarbleImg from "./assets/globe/earth-blue-marble.jpg";
@@ -55,10 +57,18 @@ const MyGlobe = () => {
   const [countryEncyclopedia, setCountryEncyclopedia] = useState([]);
   const [places] = useState(initialPlaces);
   const [issLocation, setIssLocation] = useState(null);
+  const [isHQOpen, setIsHQOpen] = useState(false);
   const poles = [
     { name: "N", lat: 90, lng: 0, isPole: true },
     { name: "S", lat: -90, lng: 0, isPole: true },
   ];
+  // --- ADD CREATOR HQ (Coordinates set to Bengaluru) ---
+  const creatorHQ = {
+    name: "Shriyam's HQ",
+    lat: 12.9716,
+    lng: 77.5946,
+    isHQ: true,
+  };
 
   // Cinematic Tour States
   const [activeTour, setActiveTour] = useState(null);
@@ -474,6 +484,12 @@ const MyGlobe = () => {
         countryInfo={countryInfo}
       />
 
+      <CreatorHQPanel isHQOpen={isHQOpen} setIsHQOpen={setIsHQOpen} />
+      <BrandingBadge
+        setIsHQOpen={setIsHQOpen}
+        setIsPanelOpen={setIsPanelOpen}
+      />
+
       {measureMode && (
         <MeasurePanel
           measurePoints={measurePoints}
@@ -681,6 +697,7 @@ const MyGlobe = () => {
         htmlElementsData={[
           ...places,
           ...poles,
+          // creatorHQ,
           ...(issLocation ? [issLocation] : []),
           ...(activeTour
             ? activeTour.stops.map((stop) => ({ ...stop, isTourStop: true }))
@@ -689,6 +706,7 @@ const MyGlobe = () => {
         htmlAltitude={(d) => {
           if (d.isISS) return 0.15;
           if (d.isPole) return 0.02;
+          // if (d.isHQ) return 0.01;
           return 0;
         }}
         htmlElement={(d) => {
@@ -719,6 +737,26 @@ const MyGlobe = () => {
               <div class="marker-dot" style="background-color: ${isActive ? "#2ecc71" : "#ffcc00"}; box-shadow: 0 0 15px ${isActive ? "#2ecc71" : "#ffcc00"}; transform: scale(${isActive ? 1.5 : 1});"></div>
               <div class="marker-label" style="color: ${isActive ? "#2ecc71" : "white"}; font-weight: ${isActive ? "bold" : "normal"}; text-shadow: 0 0 5px black;">${d.name}</div>
             `;
+          } else if (d.isHQ) {
+            el.innerHTML = `
+                <div class="marker-dot" style="background-color: #ffaa00; box-shadow: 0 0 15px #ffaa00; transform: scale(1.5);"></div>
+                <div class="marker-label" style="color: #ffaa00; font-weight: bold; text-shadow: 0 0 5px black;">${d.name}</div>
+              `;
+            el.style.pointerEvents = "auto";
+            el.style.cursor = "pointer";
+            el.onclick = () => {
+              if (measureMode) {
+                handleMapClick(d.lat, d.lng);
+                return;
+              }
+              if (activeTour) endTour();
+              setIsPanelOpen(false); // Close country panel if open
+              setIsHQOpen(true); // Open HQ panel
+              globeEl.current.pointOfView(
+                { lat: d.lat, lng: d.lng, altitude: 0.5 },
+                1000,
+              );
+            };
           } else {
             el.innerHTML = `<div class="marker-dot"></div><div class="marker-label">${d.name}</div>`;
             el.style.pointerEvents = "auto";

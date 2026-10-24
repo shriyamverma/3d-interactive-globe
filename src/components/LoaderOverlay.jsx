@@ -4,7 +4,20 @@ const LoaderOverlay = ({ isDataLoaded, isGlobeReady, isImagesLoaded }) => {
   return (
     <div className="loader-overlay">
       <div className="loader-spinner">🌍</div>
-      <h2 className="loader-text">Initializing Earth...</h2>
+      <h2 className="loader-text" style={{ marginBottom: "5px" }}>
+        Interactive Earth
+      </h2>
+      <p
+        style={{
+          color: "#00ffff",
+          letterSpacing: "3px",
+          margin: "0 0 20px 0",
+          fontSize: "12px",
+          textTransform: "uppercase",
+        }}
+      >
+        Engineered by Shriyam Verma
+      </p>
       <div className="loader-status">
         <span style={{ color: isDataLoaded ? "#2ecc71" : "#ffcc00" }}>
           {isDataLoaded ? "✓ Data Loaded" : "Downloading Map Data..."}
