@@ -1,11 +1,20 @@
 import React, { useState, useEffect, useRef } from "react";
 import Globe from "react-globe.gl";
 import * as THREE from "three";
+
+// Utilities & Data
 import { calculateDistance, getCentroid } from "./utils";
 import { initialPlaces } from "./data";
 import { tours } from "./tours";
 import "./MyGlobe.css";
 
+// Refactored UI Components
+import LoaderOverlay from "./components/LoaderOverlay";
+import CountryInfoPanel from "./components/CountryInfoPanel";
+import MeasurePanel from "./components/MeasurePanel";
+import TourPanel from "./components/TourPanel";
+
+// Assets
 import earthBlueMarbleImg from "./assets/globe/earth-blue-marble.jpg";
 import earthDayImg from "./assets/globe/earth-day.jpg";
 import earthNightImg from "./assets/globe/earth-night.jpg";
@@ -15,6 +24,7 @@ import moonTextureImg from "./assets/globe/moon-texture.jpg";
 const MyGlobe = () => {
   const globeEl = useRef();
 
+  // Core Data States
   const [countries, setCountries] = useState([]);
   const [hoveredCountry, setHoveredCountry] = useState(null);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
@@ -24,23 +34,21 @@ const MyGlobe = () => {
 
   const isLoading = !isDataLoaded || !isGlobeReady || !isImagesLoaded;
 
-  // States for our control panel
+  // Control Panel States
   const [autoRotate, setAutoRotate] = useState(true);
   const [showCountries, setShowCountries] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [sunlight, setSunlight] = useState(false);
   const [showLabels, setShowLabels] = useState(false);
   const [showMoon, setShowMoon] = useState(false);
-
-  // --- NEW: Track if the control panel is expanded ---
   const [isControlsOpen, setIsControlsOpen] = useState(true);
 
-  // States for Distance Measure Tool
+  // Distance Measure Tool States
   const [measureMode, setMeasureMode] = useState(false);
   const [measurePoints, setMeasurePoints] = useState([]);
   const [measureDistance, setMeasureDistance] = useState(null);
 
-  // States for Slide-Out Info Panel
+  // Slide-Out Info Panel States
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [countryInfo, setCountryInfo] = useState(null);
 
@@ -52,13 +60,12 @@ const MyGlobe = () => {
     { name: "S", lat: -90, lng: 0, isPole: true },
   ];
 
-  // --- Cinematic Tour States ---
+  // Cinematic Tour States
   const [activeTour, setActiveTour] = useState(null);
   const [tourStep, setTourStep] = useState(0);
 
   // Fetch data and preload images on mount
   useEffect(() => {
-    // 1. Fetch JSON Data
     Promise.all([
       fetch(
         "https://raw.githubusercontent.com/vasturiano/react-globe.gl/master/example/datasets/ne_110m_admin_0_countries.geojson",
@@ -72,8 +79,6 @@ const MyGlobe = () => {
       setIsDataLoaded(true);
     });
 
-    // 2. Preload Tour Images in the background
-    // Flatten the tours array to get a single array of all image URLs
     const imageUrls = tours
       .flatMap((tour) => tour.stops.map((stop) => stop.image))
       .filter(Boolean);
@@ -82,16 +87,17 @@ const MyGlobe = () => {
       return new Promise((resolve) => {
         const img = new Image();
         img.src = url;
-        img.onload = resolve; // Resolves when downloaded
-        img.onerror = resolve; // Resolves even if an image fails, so the app doesn't break
+        img.onload = resolve;
+        img.onerror = resolve;
       });
     });
 
     Promise.all(imagePromises).then(() => {
-      setIsImagesLoaded(true); // Images are fully cached!
+      setIsImagesLoaded(true);
     });
   }, []);
 
+  // Fetch ISS Data
   useEffect(() => {
     const fetchISS = async () => {
       try {
@@ -115,40 +121,36 @@ const MyGlobe = () => {
     return () => clearInterval(interval);
   }, []);
 
+  // Camera Controls
   useEffect(() => {
     if (globeEl.current && globeEl.current.controls()) {
       const controls = globeEl.current.controls();
-      // Disable auto-rotate when a tour is active
       controls.autoRotate = autoRotate && !activeTour;
       controls.autoRotateSpeed = 0.5;
       controls.enableDamping = true;
     }
   }, [autoRotate, activeTour]);
 
-  // --- Pre-build the custom globe material ---
+  // Pre-build the custom globe material
   useEffect(() => {
     const textureLoader = new THREE.TextureLoader();
     textureLoader.setCrossOrigin("Anonymous");
 
-    // Download all textures in parallel
     Promise.all([
       new Promise((res) => textureLoader.load(earthBlueMarbleImg, res)),
       new Promise((res) => textureLoader.load(earthDayImg, res)),
       new Promise((res) => textureLoader.load(earthNightImg, res)),
       new Promise((res) => textureLoader.load(earthTopologyImg, res)),
     ]).then(([blueMarbleTex, dayTex, nightTex, bumpTex]) => {
-      // Create a custom material with the Blue Marble as the default
       const material = new THREE.MeshPhongMaterial({
         map: blueMarbleTex,
         bumpMap: bumpTex,
         bumpScale: 0.015,
-        // Restore standard colors and ocean reflections
         color: new THREE.Color(0xffffff),
-        specular: new THREE.Color(0x333333), // Gives the oceans a subtle shine
+        specular: new THREE.Color(0x333333),
         shininess: 15,
       });
 
-      // Store the textures securely inside the material object so we can swap them instantly later
       material.userData = {
         blueMarble: blueMarbleTex,
         day: dayTex,
@@ -163,7 +165,6 @@ const MyGlobe = () => {
   useEffect(() => {
     let interval;
 
-    // 1. Instantly swap the textures on our custom material
     if (customGlobeMaterial) {
       if (sunlight) {
         customGlobeMaterial.map = customGlobeMaterial.userData.day;
@@ -175,10 +176,9 @@ const MyGlobe = () => {
         customGlobeMaterial.emissiveMap = null;
         customGlobeMaterial.emissiveIntensity = 0;
       }
-      customGlobeMaterial.needsUpdate = true; // Tell WebGL to render the changes
+      customGlobeMaterial.needsUpdate = true;
     }
 
-    // 2. Position the sun and adjust lighting
     const updateSunPosition = () => {
       if (globeEl.current) {
         const scene = globeEl.current.scene();
@@ -237,7 +237,7 @@ const MyGlobe = () => {
     };
   }, [sunlight, customGlobeMaterial]);
 
-  // --- 3D Moon & Orbit Animation ---
+  // 3D Moon & Orbit Animation
   useEffect(() => {
     if (!globeEl.current) return;
 
@@ -249,45 +249,32 @@ const MyGlobe = () => {
       const textureLoader = new THREE.TextureLoader();
       textureLoader.setCrossOrigin("Anonymous");
 
-      // The Earth in react-globe has a radius of 100.
-      // 1. Scientifically accurate relative size (27% of Earth's radius)
       const moonGeo = new THREE.SphereGeometry(27, 32, 32);
       const moonMat = new THREE.MeshStandardMaterial({
         color: 0xffffff,
-        roughness: 1.0, // The moon is very dusty, not shiny
+        roughness: 1.0,
         metalness: 0.0,
       });
 
       moonMesh = new THREE.Mesh(moonGeo, moonMat);
       scene.add(moonMesh);
 
-      // Load a high-res texture from the official Three.js examples repository
       textureLoader.load(moonTextureImg, (tex) => {
         moonMat.map = tex;
         moonMat.needsUpdate = true;
       });
 
-      // Animate the Moon's orbit
       let angle = 0;
       const animateMoon = () => {
-        angle += 0.002; // Speed of the orbit
-
-        // 2. Keep distance at 250 so it stays on screen
+        angle += 0.002;
         const distance = 250;
-
-        // 3. Accurate 5.14 degree orbital inclination
         const inclination = 5.14 * (Math.PI / 180);
 
-        // Orbit math: radius of 220 units keeps it comfortably outside the Earth
         moonMesh.position.x = Math.cos(angle) * distance;
-
-        // Apply the tilt to the Y and Z axes
         moonMesh.position.z =
           Math.sin(angle) * distance * Math.cos(inclination);
         moonMesh.position.y =
           Math.sin(angle) * distance * Math.sin(inclination);
-
-        // Accurate tidally locked rotation (the same side always faces Earth)
         moonMesh.rotation.y = -angle + Math.PI / 2;
 
         animationFrameId = requestAnimationFrame(animateMoon);
@@ -296,7 +283,6 @@ const MyGlobe = () => {
       animateMoon();
     }
 
-    // Cleanup function when the moon is hidden or component unmounts
     return () => {
       if (moonMesh) {
         scene.remove(moonMesh);
@@ -309,11 +295,10 @@ const MyGlobe = () => {
     };
   }, [showMoon]);
 
-  // --- Tour Camera Logic ---
+  // Tour Camera Logic
   useEffect(() => {
     if (activeTour && globeEl.current) {
       const stop = activeTour.stops[tourStep];
-      // Fly the camera smoothly to the current tour stop (2500ms duration)
       globeEl.current.pointOfView(
         { lat: stop.lat, lng: stop.lng, altitude: 0.6 },
         2500,
@@ -337,7 +322,7 @@ const MyGlobe = () => {
   };
 
   const showCountryInfo = (properties) => {
-    if (activeTour) return; // Disable info panel during tours
+    if (activeTour) return;
 
     const countryName = properties.ADMIN || properties.NAME || "Unknown";
     setIsPanelOpen(true);
@@ -399,7 +384,6 @@ const MyGlobe = () => {
       return;
     }
 
-    // Cancel tour if searching
     if (activeTour) endTour();
 
     const country = countries.find((c) => c.properties.ADMIN === countryName);
@@ -421,7 +405,6 @@ const MyGlobe = () => {
     showCountryInfo(polygon.properties);
   };
 
-  // --- Tour Handlers ---
   const handleTourSelect = (e) => {
     const tourId = e.target.value;
     if (!tourId) {
@@ -462,7 +445,7 @@ const MyGlobe = () => {
     setMeasurePoints([]);
     setMeasureDistance(null);
     setIsPanelOpen(false);
-    endTour(); // Clear tour on reset
+    endTour();
     globeEl.current.pointOfView({ altitude: 2.5 }, 1000);
   };
 
@@ -478,171 +461,39 @@ const MyGlobe = () => {
   return (
     <div className="globe-container">
       {isLoading && (
-        <div className="loader-overlay">
-          <div className="loader-spinner">🌍</div>
-          <h2 className="loader-text">Initializing Earth...</h2>
-          <div className="loader-status">
-            <span style={{ color: isDataLoaded ? "#2ecc71" : "#ffcc00" }}>
-              {isDataLoaded ? "✓ Data Loaded" : "Downloading Map Data..."}
-            </span>
-            <span style={{ color: isGlobeReady ? "#2ecc71" : "#ffcc00" }}>
-              {isGlobeReady
-                ? "✓ Textures Loaded"
-                : "Rendering 3D Environment..."}
-            </span>
-            <span style={{ color: isImagesLoaded ? "#2ecc71" : "#ffcc00" }}>
-              {isImagesLoaded ? "✓ Media Loaded" : "Caching Tour Images..."}
-            </span>
-          </div>
-        </div>
+        <LoaderOverlay
+          isDataLoaded={isDataLoaded}
+          isGlobeReady={isGlobeReady}
+          isImagesLoaded={isImagesLoaded}
+        />
       )}
 
-      {/* Slide-Out Info Panel */}
-      <div className={`info-panel ${isPanelOpen ? "open" : ""}`}>
-        <button
-          className="info-panel-close"
-          onClick={() => setIsPanelOpen(false)}
-        >
-          ×
-        </button>
-        {countryInfo ? (
-          <div style={{ marginTop: "30px" }}>
-            {countryInfo.flag && (
-              <img
-                src={countryInfo.flag}
-                alt={`${countryInfo.name} flag`}
-                className="flag"
-              />
-            )}
-            <h2 style={{ marginTop: 0, marginBottom: "20px" }}>
-              {countryInfo.name}
-            </h2>
-            <div className="info-item">
-              <label>Capital</label>
-              <div>{countryInfo.capital}</div>
-            </div>
-            <div className="info-item">
-              <label>Region</label>
-              <div>{countryInfo.region}</div>
-            </div>
-            <div className="info-item">
-              <label>Population</label>
-              <div>{countryInfo.population}</div>
-            </div>
-            <div className="info-item">
-              <label>Currencies</label>
-              <div>{countryInfo.currencies}</div>
-            </div>
-            <div className="info-item">
-              <label>Languages</label>
-              <div>{countryInfo.languages}</div>
-            </div>
-            {countryInfo.error && (
-              <div
-                style={{
-                  color: "coral",
-                  marginTop: "20px",
-                  fontSize: "12px",
-                  fontStyle: "italic",
-                }}
-              >
-                - {countryInfo.error}
-              </div>
-            )}
-          </div>
-        ) : null}
-      </div>
+      <CountryInfoPanel
+        isPanelOpen={isPanelOpen}
+        setIsPanelOpen={setIsPanelOpen}
+        countryInfo={countryInfo}
+      />
 
-      {/* Measure UI Panel */}
       {measureMode && (
-        <div className="measure-panel">
-          <h3 className="measure-title">Measure Distance</h3>
-          {measurePoints.length === 0 && (
-            <p style={{ margin: 0 }}>
-              Click anywhere on the globe to set <b>Point A</b>.
-            </p>
-          )}
-          {measurePoints.length === 1 && (
-            <p style={{ margin: 0 }}>
-              Click another spot to set <b>Point B</b>.
-            </p>
-          )}
-          {measurePoints.length === 2 && (
-            <>
-              <div className="measure-value">
-                {measureDistance.toLocaleString()} km
-              </div>
-              <button
-                className="panel-element btn-measure-reset"
-                onClick={() => {
-                  setMeasurePoints([]);
-                  setMeasureDistance(null);
-                }}
-              >
-                Reset Points
-              </button>
-            </>
-          )}
-        </div>
+        <MeasurePanel
+          measurePoints={measurePoints}
+          measureDistance={measureDistance}
+          setMeasurePoints={setMeasurePoints}
+          setMeasureDistance={setMeasureDistance}
+        />
       )}
 
-      {/* --- Guided Tour UI Panel --- */}
       {activeTour && (
-        <div className="tour-panel">
-          <div className="tour-header">
-            <span>{activeTour.name}</span>
-            <span>
-              {tourStep + 1} / {activeTour.stops.length}
-            </span>
-          </div>
-
-          {activeTour.stops[tourStep].image && (
-            <div className="tour-image-container">
-              <a
-                href={activeTour.stops[tourStep].link}
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Read more on Wikipedia"
-              >
-                <img
-                  src={activeTour.stops[tourStep].image}
-                  alt={activeTour.stops[tourStep].name}
-                  className="tour-image"
-                />
-                <div className="tour-image-hint">
-                  <small>↗ Read on Wikipedia</small>
-                </div>
-              </a>
-            </div>
-          )}
-
-          <h3>{activeTour.stops[tourStep].name}</h3>
-          <p>{activeTour.stops[tourStep].description}</p>
-
-          <div className="tour-controls">
-            <button className="tour-btn" onClick={endTour}>
-              Exit Tour
-            </button>
-            <button
-              className="tour-btn"
-              onClick={prevTourStep}
-              disabled={tourStep === 0}
-            >
-              Previous
-            </button>
-            <button
-              className="tour-btn tour-btn-primary"
-              onClick={nextTourStep}
-            >
-              {tourStep === activeTour.stops.length - 1
-                ? "Finish"
-                : "Next Stop"}
-            </button>
-          </div>
-        </div>
+        <TourPanel
+          activeTour={activeTour}
+          tourStep={tourStep}
+          endTour={endTour}
+          prevTourStep={prevTourStep}
+          nextTourStep={nextTourStep}
+        />
       )}
 
-      {/* --- UPDATED: Collapsible Control Panel --- */}
+      {/* Collapsible Control Panel */}
       <div
         className="control-panel"
         style={{
@@ -661,7 +512,6 @@ const MyGlobe = () => {
           flexDirection: "column",
         }}
       >
-        {/* Clickable Header */}
         <div
           onClick={() => setIsControlsOpen(!isControlsOpen)}
           style={{
@@ -690,7 +540,6 @@ const MyGlobe = () => {
           </span>
         </div>
 
-        {/* Inner Controls (Only visible when isControlsOpen is true) */}
         {isControlsOpen && (
           <div
             style={{ display: "flex", flexDirection: "column", gap: "10px" }}
@@ -804,12 +653,6 @@ const MyGlobe = () => {
         ref={globeEl}
         onGlobeReady={() => setIsGlobeReady(true)}
         globeMaterial={customGlobeMaterial}
-        // globeImageUrl={
-        //   sunlight
-        //     ? "https://unpkg.com/three-globe/example/img/earth-day.jpg"
-        //     : "https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg"
-        // }
-        // bumpImageUrl="//unpkg.com/three-globe/example/img/earth-topology.png"
         backgroundImageUrl="//unpkg.com/three-globe/example/img/night-sky.png"
         onGlobeClick={({ lat, lng }) => {
           if (measureMode) handleMapClick(lat, lng);
@@ -835,7 +678,6 @@ const MyGlobe = () => {
         labelResolution={2}
         labelAltitude={0.02}
         onPolygonClick={handlePolygonClick}
-        // --- Combine cities, ISS, AND active tour stops ---
         htmlElementsData={[
           ...places,
           ...poles,
