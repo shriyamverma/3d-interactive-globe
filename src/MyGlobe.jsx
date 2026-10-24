@@ -22,6 +22,7 @@ import earthDayImg from "./assets/globe/earth-day.jpg";
 import earthNightImg from "./assets/globe/earth-night.jpg";
 import earthTopologyImg from "./assets/globe/earth-topology.png";
 import moonTextureImg from "./assets/globe/moon-texture.jpg";
+import nightSkyImg from "./assets/globe/night-sky.png";
 
 const MyGlobe = () => {
   const globeEl = useRef();
@@ -151,24 +152,28 @@ const MyGlobe = () => {
       new Promise((res) => textureLoader.load(earthDayImg, res)),
       new Promise((res) => textureLoader.load(earthNightImg, res)),
       new Promise((res) => textureLoader.load(earthTopologyImg, res)),
-    ]).then(([blueMarbleTex, dayTex, nightTex, bumpTex]) => {
-      const material = new THREE.MeshPhongMaterial({
-        map: blueMarbleTex,
-        bumpMap: bumpTex,
-        bumpScale: 0.015,
-        color: new THREE.Color(0xffffff),
-        specular: new THREE.Color(0x333333),
-        shininess: 15,
-      });
+      new Promise((res) => textureLoader.load(moonTextureImg, res)),
+      new Promise((res) => textureLoader.load(nightSkyImg, res)),
+    ]).then(
+      ([blueMarbleTex, dayTex, nightTex, bumpTex, moonTex, nightSkyTex]) => {
+        const material = new THREE.MeshPhongMaterial({
+          map: blueMarbleTex,
+          bumpMap: bumpTex,
+          bumpScale: 0.015,
+          color: new THREE.Color(0xffffff),
+          specular: new THREE.Color(0x333333),
+          shininess: 15,
+        });
 
-      material.userData = {
-        blueMarble: blueMarbleTex,
-        day: dayTex,
-        night: nightTex,
-      };
+        material.userData = {
+          blueMarble: blueMarbleTex,
+          day: dayTex,
+          night: nightTex,
+        };
 
-      setCustomGlobeMaterial(material);
-    });
+        setCustomGlobeMaterial(material);
+      },
+    );
   }, []);
 
   // Solar Illumination & Glowing City Lights
@@ -180,7 +185,7 @@ const MyGlobe = () => {
         customGlobeMaterial.map = customGlobeMaterial.userData.day;
         customGlobeMaterial.emissiveMap = customGlobeMaterial.userData.night;
         customGlobeMaterial.emissive = new THREE.Color(0xffffff);
-        customGlobeMaterial.emissiveIntensity = 0.8;
+        customGlobeMaterial.emissiveIntensity = 0.3;
       } else {
         customGlobeMaterial.map = customGlobeMaterial.userData.blueMarble;
         customGlobeMaterial.emissiveMap = null;
@@ -357,10 +362,11 @@ const MyGlobe = () => {
         flag: flagUrl,
         capital:
           info.capital && info.capital.length > 0 ? info.capital[0] : "N/A",
+        region: info.region || "N/A",
+        area: info.area ? `${info.area.toLocaleString()} km²` : "N/A",
         population: properties.POP_EST
           ? properties.POP_EST.toLocaleString()
           : "N/A",
-        region: info.region || "N/A",
         currencies: info.currencies
           ? Object.values(info.currencies)
               .map((c) => c.name)
@@ -376,6 +382,7 @@ const MyGlobe = () => {
         flag: flagUrl,
         capital: "N/A",
         region: properties.CONTINENT || "N/A",
+        area: "N/A",
         population: properties.POP_EST
           ? properties.POP_EST.toLocaleString()
           : "N/A",
@@ -669,7 +676,7 @@ const MyGlobe = () => {
         ref={globeEl}
         onGlobeReady={() => setIsGlobeReady(true)}
         globeMaterial={customGlobeMaterial}
-        backgroundImageUrl="//unpkg.com/three-globe/example/img/night-sky.png"
+        backgroundImageUrl={nightSkyImg}
         onGlobeClick={({ lat, lng }) => {
           if (measureMode) handleMapClick(lat, lng);
         }}

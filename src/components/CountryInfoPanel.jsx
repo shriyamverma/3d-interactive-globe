@@ -21,26 +21,37 @@ const CountryInfoPanel = ({ isPanelOpen, setIsPanelOpen, countryInfo }) => {
           <h2 style={{ marginTop: 0, marginBottom: "20px" }}>
             {countryInfo.name}
           </h2>
+
           <div className="info-item">
             <label>Capital</label>
             <div>{countryInfo.capital}</div>
           </div>
+
           <div className="info-item">
             <label>Region</label>
             <div>{countryInfo.region}</div>
           </div>
+
+          <div className="info-item">
+            <label>Area</label>
+            <div>{countryInfo.area}</div>
+          </div>
+
           <div className="info-item">
             <label>Population</label>
             <div>{countryInfo.population}</div>
           </div>
+
           <div className="info-item">
             <label>Currencies</label>
             <div>{countryInfo.currencies}</div>
           </div>
+
           <div className="info-item">
             <label>Languages</label>
             <div>{countryInfo.languages}</div>
           </div>
+
           {countryInfo.error && (
             <div
               style={{
