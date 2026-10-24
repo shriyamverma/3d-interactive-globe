@@ -1,9 +1,16 @@
 import React, { useState, useEffect, useRef } from "react";
 import Globe from "react-globe.gl";
+import * as THREE from "three";
 import { calculateDistance, getCentroid } from "./utils";
 import { initialPlaces } from "./data";
 import { tours } from "./tours";
 import "./MyGlobe.css";
+
+import earthBlueMarbleImg from "./assets/globe/earth-blue-marble.jpg";
+import earthDayImg from "./assets/globe/earth-day.jpg";
+import earthNightImg from "./assets/globe/earth-night.jpg";
+import earthTopologyImg from "./assets/globe/earth-topology.png";
+import moonTextureImg from "./assets/globe/moon-texture.jpg";
 
 const MyGlobe = () => {
   const globeEl = useRef();
@@ -13,6 +20,7 @@ const MyGlobe = () => {
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [isGlobeReady, setIsGlobeReady] = useState(false);
   const [isImagesLoaded, setIsImagesLoaded] = useState(false);
+  const [customGlobeMaterial, setCustomGlobeMaterial] = useState(null);
 
   const isLoading = !isDataLoaded || !isGlobeReady || !isImagesLoaded;
 
@@ -22,6 +30,7 @@ const MyGlobe = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [sunlight, setSunlight] = useState(false);
   const [showLabels, setShowLabels] = useState(false);
+  const [showMoon, setShowMoon] = useState(false);
 
   // States for Distance Measure Tool
   const [measureMode, setMeasureMode] = useState(false);
@@ -113,10 +122,60 @@ const MyGlobe = () => {
     }
   }, [autoRotate, activeTour]);
 
-  // Solar Illumination
+  // --- NEW: Pre-build the custom globe material ---
+  useEffect(() => {
+    const textureLoader = new THREE.TextureLoader();
+    textureLoader.setCrossOrigin("Anonymous");
+
+    // Download all textures in parallel
+    Promise.all([
+      new Promise((res) => textureLoader.load(earthBlueMarbleImg, res)),
+      new Promise((res) => textureLoader.load(earthDayImg, res)),
+      new Promise((res) => textureLoader.load(earthNightImg, res)),
+      new Promise((res) => textureLoader.load(earthTopologyImg, res)),
+    ]).then(([blueMarbleTex, dayTex, nightTex, bumpTex]) => {
+      // Create a custom material with the Blue Marble as the default
+      const material = new THREE.MeshPhongMaterial({
+        map: blueMarbleTex,
+        bumpMap: bumpTex,
+        bumpScale: 0.015,
+        // --- NEW: Restore standard colors and ocean reflections ---
+        color: new THREE.Color(0xffffff),
+        specular: new THREE.Color(0x333333), // Gives the oceans a subtle shine
+        shininess: 15,
+      });
+
+      // Store the textures securely inside the material object so we can swap them instantly later
+      material.userData = {
+        blueMarble: blueMarbleTex,
+        day: dayTex,
+        night: nightTex,
+      };
+
+      setCustomGlobeMaterial(material);
+    });
+  }, []);
+
+  // Solar Illumination & Glowing City Lights
   useEffect(() => {
     let interval;
 
+    // 1. Instantly swap the textures on our custom material
+    if (customGlobeMaterial) {
+      if (sunlight) {
+        customGlobeMaterial.map = customGlobeMaterial.userData.day;
+        customGlobeMaterial.emissiveMap = customGlobeMaterial.userData.night;
+        customGlobeMaterial.emissive = new THREE.Color(0xffffff);
+        customGlobeMaterial.emissiveIntensity = 0.8;
+      } else {
+        customGlobeMaterial.map = customGlobeMaterial.userData.blueMarble;
+        customGlobeMaterial.emissiveMap = null;
+        customGlobeMaterial.emissiveIntensity = 0;
+      }
+      customGlobeMaterial.needsUpdate = true; // Tell WebGL to render the changes
+    }
+
+    // 2. Position the sun and adjust lighting
     const updateSunPosition = () => {
       if (globeEl.current) {
         const scene = globeEl.current.scene();
@@ -131,7 +190,7 @@ const MyGlobe = () => {
           if (sunlight) {
             ambientLight.intensity = 0.02;
             ambientLight.color.setHex(0x222233);
-            directionalLight.intensity = 4;
+            directionalLight.intensity = 3;
             directionalLight.color.setHex(0xffffee);
 
             const now = new Date();
@@ -140,13 +199,10 @@ const MyGlobe = () => {
               now.getUTCMinutes() / 60 +
               now.getUTCSeconds() / 3600;
 
-            // Calculate where the sun is currently positioned over the Earth
             const sunLng = 180 - utcHour * 15;
             const month = now.getUTCMonth();
             const sunLat = -23.5 * Math.cos(((month + 0.5) * Math.PI) / 6);
 
-            // FIXED TRIGONOMETRY:
-            // (90 - sunLng) maps the coordinates properly to the 3D globe's axis
             const phi = (90 - sunLat) * (Math.PI / 180);
             const theta = (90 - sunLng) * (Math.PI / 180);
             const r = 200;
@@ -167,17 +223,93 @@ const MyGlobe = () => {
       }
     };
 
-    const timeout = setTimeout(updateSunPosition, 100);
+    updateSunPosition();
 
     if (sunlight) {
       interval = setInterval(updateSunPosition, 60000);
     }
 
     return () => {
-      clearTimeout(timeout);
       if (interval) clearInterval(interval);
     };
-  }, [sunlight]);
+  }, [sunlight, customGlobeMaterial]);
+
+  // --- NEW: 3D Moon & Orbit Animation ---
+  useEffect(() => {
+    if (!globeEl.current) return;
+
+    const scene = globeEl.current.scene();
+    let moonMesh;
+    let animationFrameId;
+
+    if (showMoon) {
+      const textureLoader = new THREE.TextureLoader();
+      textureLoader.setCrossOrigin("Anonymous");
+
+      // The Earth in react-globe has a radius of 100.
+      // We set the Moon to radius 15 so it looks visually balanced.
+      // 1. Scientifically accurate relative size (27% of Earth's radius)
+      const moonGeo = new THREE.SphereGeometry(27, 32, 32);
+      const moonMat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        roughness: 1.0, // The moon is very dusty, not shiny
+        metalness: 0.0,
+      });
+
+      moonMesh = new THREE.Mesh(moonGeo, moonMat);
+      scene.add(moonMesh);
+
+      // Load a high-res texture from the official Three.js examples repository
+      textureLoader.load(
+        // "https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/moon_1024.jpg",
+        moonTextureImg,
+        (tex) => {
+          moonMat.map = tex;
+          moonMat.needsUpdate = true;
+        },
+      );
+
+      // Animate the Moon's orbit
+      let angle = 0;
+      const animateMoon = () => {
+        angle += 0.002; // Speed of the orbit
+
+        // 2. Keep distance at 250 so it stays on screen
+        const distance = 250;
+
+        // 3. Accurate 5.14 degree orbital inclination
+        const inclination = 5.14 * (Math.PI / 180);
+
+        // Orbit math: radius of 220 units keeps it comfortably outside the Earth
+        moonMesh.position.x = Math.cos(angle) * distance;
+
+        // Apply the tilt to the Y and Z axes
+        moonMesh.position.z =
+          Math.sin(angle) * distance * Math.cos(inclination);
+        moonMesh.position.y =
+          Math.sin(angle) * distance * Math.sin(inclination);
+
+        // Accurate tidally locked rotation (the same side always faces Earth)
+        moonMesh.rotation.y = -angle + Math.PI / 2;
+
+        animationFrameId = requestAnimationFrame(animateMoon);
+      };
+
+      animateMoon();
+    }
+
+    // Cleanup function when the moon is hidden or component unmounts
+    return () => {
+      if (moonMesh) {
+        scene.remove(moonMesh);
+        moonMesh.geometry.dispose();
+        moonMesh.material.dispose();
+      }
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+    };
+  }, [showMoon]);
 
   // --- Tour Camera Logic ---
   useEffect(() => {
@@ -573,6 +705,12 @@ const MyGlobe = () => {
           {sunlight ? "Disable Sunlight" : "Enable Sunlight"}
         </button>
         <button
+          onClick={() => setShowMoon(!showMoon)}
+          className="panel-element"
+        >
+          {showMoon ? "Hide Moon" : "Show Moon"}
+        </button>
+        <button
           onClick={toggleMeasureMode}
           className={`panel-element ${measureMode ? "active-measure" : ""}`}
           disabled={activeTour}
@@ -606,8 +744,13 @@ const MyGlobe = () => {
       <Globe
         ref={globeEl}
         onGlobeReady={() => setIsGlobeReady(true)}
-        globeImageUrl="//unpkg.com/three-globe/example/img/earth-blue-marble.jpg"
-        bumpImageUrl="//unpkg.com/three-globe/example/img/earth-topology.png"
+        globeMaterial={customGlobeMaterial}
+        // globeImageUrl={
+        //   sunlight
+        //     ? "https://unpkg.com/three-globe/example/img/earth-day.jpg"
+        //     : "https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg"
+        // }
+        // bumpImageUrl="//unpkg.com/three-globe/example/img/earth-topology.png"
         backgroundImageUrl="//unpkg.com/three-globe/example/img/night-sky.png"
         onGlobeClick={({ lat, lng }) => {
           if (measureMode) handleMapClick(lat, lng);
