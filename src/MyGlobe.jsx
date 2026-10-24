@@ -32,6 +32,9 @@ const MyGlobe = () => {
   const [showLabels, setShowLabels] = useState(false);
   const [showMoon, setShowMoon] = useState(false);
 
+  // --- NEW: Track if the control panel is expanded ---
+  const [isControlsOpen, setIsControlsOpen] = useState(true);
+
   // States for Distance Measure Tool
   const [measureMode, setMeasureMode] = useState(false);
   const [measurePoints, setMeasurePoints] = useState([]);
@@ -122,7 +125,7 @@ const MyGlobe = () => {
     }
   }, [autoRotate, activeTour]);
 
-  // --- NEW: Pre-build the custom globe material ---
+  // --- Pre-build the custom globe material ---
   useEffect(() => {
     const textureLoader = new THREE.TextureLoader();
     textureLoader.setCrossOrigin("Anonymous");
@@ -139,7 +142,7 @@ const MyGlobe = () => {
         map: blueMarbleTex,
         bumpMap: bumpTex,
         bumpScale: 0.015,
-        // --- NEW: Restore standard colors and ocean reflections ---
+        // Restore standard colors and ocean reflections
         color: new THREE.Color(0xffffff),
         specular: new THREE.Color(0x333333), // Gives the oceans a subtle shine
         shininess: 15,
@@ -234,7 +237,7 @@ const MyGlobe = () => {
     };
   }, [sunlight, customGlobeMaterial]);
 
-  // --- NEW: 3D Moon & Orbit Animation ---
+  // --- 3D Moon & Orbit Animation ---
   useEffect(() => {
     if (!globeEl.current) return;
 
@@ -247,7 +250,6 @@ const MyGlobe = () => {
       textureLoader.setCrossOrigin("Anonymous");
 
       // The Earth in react-globe has a radius of 100.
-      // We set the Moon to radius 15 so it looks visually balanced.
       // 1. Scientifically accurate relative size (27% of Earth's radius)
       const moonGeo = new THREE.SphereGeometry(27, 32, 32);
       const moonMat = new THREE.MeshStandardMaterial({
@@ -260,14 +262,10 @@ const MyGlobe = () => {
       scene.add(moonMesh);
 
       // Load a high-res texture from the official Three.js examples repository
-      textureLoader.load(
-        // "https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/moon_1024.jpg",
-        moonTextureImg,
-        (tex) => {
-          moonMat.map = tex;
-          moonMat.needsUpdate = true;
-        },
-      );
+      textureLoader.load(moonTextureImg, (tex) => {
+        moonMat.map = tex;
+        moonMat.needsUpdate = true;
+      });
 
       // Animate the Moon's orbit
       let angle = 0;
@@ -548,7 +546,7 @@ const MyGlobe = () => {
                   fontStyle: "italic",
                 }}
               >
-                * {countryInfo.error}
+                - {countryInfo.error}
               </div>
             )}
           </div>
@@ -644,100 +642,161 @@ const MyGlobe = () => {
         </div>
       )}
 
-      {/* Control Panel */}
-      <div className="control-panel">
-        <select
-          value={searchQuery}
-          onChange={handleSearch}
-          className="panel-element"
-          disabled={activeTour}
-        >
-          <option value="">Search Country...</option>
-          {[...countries]
-            .sort((a, b) =>
-              a.properties.ADMIN.localeCompare(b.properties.ADMIN),
-            )
-            .map((c) => (
-              <option key={c.properties.ADMIN} value={c.properties.ADMIN}>
-                {c.properties.ADMIN}
-              </option>
-            ))}
-        </select>
-
-        {/* --- Tour Dropdown --- */}
-        <select
-          value={activeTour ? activeTour.id : ""}
-          onChange={handleTourSelect}
-          className="panel-element"
-          style={{ color: activeTour ? "#ad8c00" : "inherit" }}
-        >
-          <option value=""> 🎬 Guided Tours... </option>
-          {tours.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}
-            </option>
-          ))}
-        </select>
-
-        <button
-          onClick={() => setAutoRotate(!autoRotate)}
-          className="panel-element"
-          disabled={activeTour}
-        >
-          {autoRotate ? "Pause Rotation" : "Start Rotation"}
-        </button>
-        <button
-          onClick={() => setShowCountries(!showCountries)}
-          className="panel-element"
-        >
-          {showCountries ? "Hide Borders" : "Show Borders"}
-        </button>
-        <button
-          onClick={() => setShowLabels(!showLabels)}
-          className="panel-element"
-        >
-          {showLabels ? "Hide Country Names" : "Show Country Names"}
-        </button>
-        <button
-          onClick={() => setSunlight(!sunlight)}
-          className="panel-element"
-        >
-          {sunlight ? "Disable Sunlight" : "Enable Sunlight"}
-        </button>
-        <button
-          onClick={() => setShowMoon(!showMoon)}
-          className="panel-element"
-        >
-          {showMoon ? "Hide Moon" : "Show Moon"}
-        </button>
-        <button
-          onClick={toggleMeasureMode}
-          className={`panel-element ${measureMode ? "active-measure" : ""}`}
-          disabled={activeTour}
-        >
-          {measureMode ? "Stop Measuring" : "Measure Distance"}
-        </button>
-
-        <button
-          onClick={() => {
-            if (issLocation) {
-              if (activeTour) endTour();
-              globeEl.current.pointOfView(
-                { lat: issLocation.lat, lng: issLocation.lng, altitude: 0.8 },
-                1000,
-              );
-            }
+      {/* --- UPDATED: Collapsible Control Panel --- */}
+      <div
+        className="control-panel"
+        style={{
+          position: "absolute",
+          top: "20px",
+          right: "20px",
+          background: "rgba(10, 10, 15, 0.6)",
+          backdropFilter: "blur(10px)",
+          padding: "15px",
+          borderRadius: "12px",
+          border: "1px solid rgba(255, 255, 255, 0.1)",
+          boxShadow: "0 4px 15px rgba(0, 0, 0, 0.5)",
+          zIndex: 10,
+          width: "220px",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        {/* Clickable Header */}
+        <div
+          onClick={() => setIsControlsOpen(!isControlsOpen)}
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            cursor: "pointer",
+            borderBottom: isControlsOpen
+              ? "1px solid rgba(255, 255, 255, 0.1)"
+              : "none",
+            paddingBottom: isControlsOpen ? "10px" : "0px",
+            marginBottom: isControlsOpen ? "10px" : "0px",
+            color: "white",
+            fontWeight: "bold",
+            userSelect: "none",
           }}
-          className="panel-element"
-          disabled={!issLocation}
-          style={{ fontWeight: "bold" }}
         >
-          🛰️ Live ISS satellite
-        </button>
+          <span>⚙️ Controls</span>
+          <span
+            style={{
+              transform: isControlsOpen ? "rotate(180deg)" : "rotate(0deg)",
+              transition: "transform 0.3s ease",
+            }}
+          >
+            ▼
+          </span>
+        </div>
 
-        <button onClick={handleReset} className="panel-element btn-reset">
-          Reset View
-        </button>
+        {/* Inner Controls (Only visible when isControlsOpen is true) */}
+        {isControlsOpen && (
+          <div
+            style={{ display: "flex", flexDirection: "column", gap: "10px" }}
+          >
+            <select
+              value={searchQuery}
+              onChange={handleSearch}
+              className="panel-element"
+              disabled={activeTour}
+            >
+              <option value="">Search Country...</option>
+              {[...countries]
+                .sort((a, b) =>
+                  a.properties.ADMIN.localeCompare(b.properties.ADMIN),
+                )
+                .map((c) => (
+                  <option key={c.properties.ADMIN} value={c.properties.ADMIN}>
+                    {c.properties.ADMIN}
+                  </option>
+                ))}
+            </select>
+
+            <select
+              value={activeTour ? activeTour.id : ""}
+              onChange={handleTourSelect}
+              className="panel-element"
+              style={{ color: activeTour ? "#ad8c00" : "inherit" }}
+            >
+              <option value=""> 🎬 Guided Tours... </option>
+              {tours.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+
+            <button
+              onClick={() => setAutoRotate(!autoRotate)}
+              className="panel-element"
+              disabled={activeTour}
+            >
+              {autoRotate ? "Pause Rotation" : "Start Rotation"}
+            </button>
+
+            <button
+              onClick={() => setShowCountries(!showCountries)}
+              className="panel-element"
+            >
+              {showCountries ? "Hide Borders" : "Show Borders"}
+            </button>
+
+            <button
+              onClick={() => setShowLabels(!showLabels)}
+              className="panel-element"
+            >
+              {showLabels ? "Hide Country Names" : "Show Country Names"}
+            </button>
+
+            <button
+              onClick={() => setSunlight(!sunlight)}
+              className="panel-element"
+            >
+              {sunlight ? "Disable Sunlight" : "Enable Sunlight"}
+            </button>
+
+            <button
+              onClick={() => setShowMoon(!showMoon)}
+              className="panel-element"
+            >
+              {showMoon ? "Hide Moon" : "Show Moon"}
+            </button>
+
+            <button
+              onClick={toggleMeasureMode}
+              className={`panel-element ${measureMode ? "active-measure" : ""}`}
+              disabled={activeTour}
+            >
+              {measureMode ? "Stop Measuring" : "Measure Distance"}
+            </button>
+
+            <button
+              onClick={() => {
+                if (issLocation) {
+                  if (activeTour) endTour();
+                  globeEl.current.pointOfView(
+                    {
+                      lat: issLocation.lat,
+                      lng: issLocation.lng,
+                      altitude: 0.8,
+                    },
+                    1000,
+                  );
+                }
+              }}
+              className="panel-element"
+              disabled={!issLocation}
+              style={{ fontWeight: "bold" }}
+            >
+              🛰️ Live ISS satellite
+            </button>
+
+            <button onClick={handleReset} className="panel-element btn-reset">
+              Reset View
+            </button>
+          </div>
+        )}
       </div>
 
       {/* 3D Globe */}
