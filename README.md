@@ -69,3 +69,5 @@ To run this project locally, follow these steps:
 ---
 
 _Built with React and Three.js_
+
+![Repository Views](https://view-counter-worker.shriyamverma.workers.dev/github?repo=shriyamverma%2F3d-interactive-globe)

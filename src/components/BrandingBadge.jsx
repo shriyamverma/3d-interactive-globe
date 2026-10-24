@@ -1,6 +1,37 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 
 const BrandingBadge = ({ setIsHQOpen, setIsPanelOpen }) => {
+  const [views, setViews] = useState("...");
+
+  useEffect(() => {
+    async function trackPageView() {
+      const endpoint = new URL(
+        "https://view-counter-worker.shriyamverma.workers.dev/website/view",
+      );
+
+      endpoint.searchParams.set("page", window.location.pathname);
+
+      try {
+        const response = await fetch(endpoint);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        // Update the state with your actual live views
+        if (data.views) {
+          setViews(data.views.toLocaleString());
+        }
+      } catch (error) {
+        console.error("View tracking failed:", error);
+        setViews("offline");
+      }
+    }
+
+    trackPageView();
+  }, []);
+
   return (
     <div
       style={{
@@ -26,10 +57,34 @@ const BrandingBadge = ({ setIsHQOpen, setIsPanelOpen }) => {
         fontWeight: "300",
       }}
     >
+      {/* Live View Counter */}
+      {/* {views !== "offline" && (
+        <>
+          <span
+            title="Total Global Views"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "5px",
+              color: "#ccc",
+            }}
+          >
+            <span style={{ fontSize: "14px" }}>👁</span> {views}
+          </span>
+          <div
+            style={{
+              width: "1px",
+              height: "14px",
+              background: "rgba(255,255,255,0.2)",
+            }}
+          ></div>
+        </>
+      )} */}
+
       <span
         onClick={() => {
-          if (setIsPanelOpen) setIsPanelOpen(false); // Close country panel if open
-          if (setIsHQOpen) setIsHQOpen(true); // Open your bio panel
+          if (setIsPanelOpen) setIsPanelOpen(false);
+          if (setIsHQOpen) setIsHQOpen(true);
         }}
         style={{ cursor: "pointer" }}
         title="Meet the Developer"
@@ -44,7 +99,6 @@ const BrandingBadge = ({ setIsHQOpen, setIsPanelOpen }) => {
         </b>
       </span>
 
-      {/* Subtle Divider */}
       <div
         style={{
           width: "1px",
